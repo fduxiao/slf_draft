@@ -1,0 +1,6 @@
+name = "SLF"
+version = "0.1.0"
+defaultTargets = ["SLF"]
+
+[[lean_lib]]
+name = "SLF"
