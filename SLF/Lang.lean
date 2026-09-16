@@ -1,9 +1,13 @@
+import Lean
 import SLF.Map
 
 
 namespace SLF.Lang
 open Map
 
+/-!
+## Definition of the language
+-/
 inductive Prim: Type where
   | ref : Prim
   | get : Prim
@@ -24,6 +28,7 @@ inductive Prim: Type where
   | ge : Prim
   | gt : Prim
   | ptr_add : Prim
+  deriving Inhabited, Repr
 
 
 def Loc: Type := Nat deriving OfNat, Inhabited, Repr
@@ -42,6 +47,7 @@ inductive Val : Type where
   | fix : Var → Var → Term → Val
   | uninit : Val
   | error : Val
+  deriving Inhabited, Repr
 
 
 inductive Term : Type where
@@ -53,6 +59,8 @@ inductive Term : Type where
   | seq : Term → Term → Term
   | let : Var → Term → Term → Term
   | if : Term → Term → Term → Term
+  deriving Inhabited, Repr
+
 end
 
 
@@ -76,13 +84,19 @@ instance: Coe Int Term where
   coe := Term.val ∘ Val.int
 
 
-instance: OfNat Val n where
+instance: Coe Nat Val where
+  coe := Val.int ∘ Int.ofNat
+
+instance {n}: OfNat Val n where
   ofNat := Val.int n
 
 
-instance: OfNat Term n where
+instance {n}: OfNat Term n where
   ofNat := Term.val (Val.int n)
 
+/-!
+## Custom syntax for the language
+-/
 
 declare_syntax_cat slf_term (behavior := symbol)
 scoped syntax "[term| " slf_term " ]" : term
@@ -93,22 +107,22 @@ scoped syntax ident : slf_term
 -- number
 scoped syntax num : slf_term
 -- application
-scoped syntax:70 slf_term:71 slf_term:70 : slf_term
+scoped syntax:70 slf_term:70 slf_term:71 : slf_term
 -- ite
-scoped syntax:31 " if " slf_term:1 " then " slf_term:1 " else " slf_term:1 : slf_term
-scoped syntax:31 " if " slf_term:1 " then " slf_term:1 " end " : slf_term
+scoped syntax:31 "if " slf_term:1 " then " slf_term:1 " else " slf_term:1 : slf_term
+scoped syntax:31 "if " slf_term:1 " then " slf_term:1 " end" : slf_term
 -- seq
 scoped syntax:32 slf_term " ; " slf_term:1 : slf_term
 -- let
-scoped syntax:32 " let " ident " := " slf_term:1 " in " slf_term:1 : slf_term
-scoped syntax:32 " let " ident ident+ " := " slf_term:1 " in " slf_term:1 : slf_term
-scoped syntax:32 " let " " rec " ident ident+ " := " slf_term:1 " in " slf_term:1 : slf_term
+scoped syntax:32 "let " ident " := " slf_term:1 " in " slf_term:1 : slf_term
+scoped syntax:32 "let " ident ident+ " := " slf_term:1 " in " slf_term:1 : slf_term
+scoped syntax:32 "let " " rec " ident ident+ " := " slf_term:1 " in " slf_term:1 : slf_term
 -- fun
-scoped syntax:31 " fun " ident+ "=>" slf_term:1 : slf_term
-scoped syntax:31 " vfun " ident+ "=>" slf_term:1 : slf_term
+scoped syntax:31 "fun " ident+ " => " slf_term:1 : slf_term
+scoped syntax:31 "vfun " ident+ " => " slf_term:1 : slf_term
 -- fix
-scoped syntax:31 " fix " ident ident+ "=>" slf_term:1 : slf_term
-scoped syntax:31 " vfix " ident ident+ "=>" slf_term:1 : slf_term
+scoped syntax:31 "fix " ident ident+ " => " slf_term:1 : slf_term
+scoped syntax:31 "vfix " ident ident+ " => " slf_term:1 : slf_term
 -- unit
 scoped syntax "unit" : slf_term
 
@@ -137,7 +151,7 @@ scoped macro_rules
 | `([term| [$t] ]) => `((($t): Term))
 | `([term| ( $t ) ]) => `([term| $t ])
 | `([term| $t:ident ]) => `(Term.var $(Lean.quote t.getId.toString))
-| `([term| $t:num ]) => `(Term.val (Val.int $(Lean.quote t.getNat)))
+| `([term| $t:num ]) => `(Val.int $(Lean.quote t.getNat))
 | `([term| $t1 $t2 ]) => `(Term.app [term| $t1 ] [term| $t2 ])
 | `([term| if $t1 then $t2 else $t3 ]) => `(Term.if [term| $t1 ] [term| $t2 ] [term| $t3 ])
 | `([term| if $t1 then $t2 end ]) => `(Term.if [term| $t1 ] [term| $t2 ] (Term.val (Val.unit)))
@@ -212,7 +226,12 @@ example: [term| if !x then y; z else !z] =
 example: [term| let x := !y in z] =
   Term.let "x" (.app Prim.get "y") "z"
 := rfl
-
+example: [term| fun x => y z] =
+  Term.fun "x" (.app "y" "z")
+:= rfl
+example: [term| (fun x => y) z] =
+  Term.app (Term.fun "x" "y") "z"
+:= rfl
 example: [term| fun x => y] =
   Term.fun "x" "y"
 := rfl
@@ -227,6 +246,9 @@ example: [term| let f x := z in f w] =
 := rfl
 example: [term| fix f x => y] =
   Term.fix "f" "x" "y"
+:= rfl
+example: [term| fix f x z w => y] =
+  Term.fix "f" "x" (Term.fun "z" (Term.fun "w" "y"))
 := rfl
 example: [term| vfix f x => y] =
   Val.fix "f" "x" "y"
@@ -278,3 +300,99 @@ example {f}: [term| let f x := x in [f] < y < z] =
 example: [term| let f x := x + 3 in f < y < z] =
   Term.let "f" (.fun "x" (.app (.app Prim.add "x") 3)) (.app (.app Prim.lt (.app (.app Prim.lt "f") "y")) "z")
 := rfl
+
+
+/-!
+## Pretty printing of the language
+-/
+
+
+@[app_unexpander Val.int]
+def unexpandValInt: Lean.PrettyPrinter.Unexpander
+  | `($_ $x:num ) => `([term| $x:num])
+  | _ => throw ()
+
+
+@[app_unexpander Term.var]
+def unexpandVar: Lean.PrettyPrinter.Unexpander
+  | `($_ $x:str) =>
+    let name := Lean.mkIdent (Lean.Name.mkStr1 x.getString)
+    `([term| $name:ident ])
+  | `($_ $x:term) => `([term| [$x] ])
+  | _ => throw ()
+
+
+@[app_unexpander Term.val]
+def unexpandVal: Lean.PrettyPrinter.Unexpander
+  | `($_ [term| $n:num ]) => `([term| $n:num])
+  | `($_ $x:num) => `([term| $x:num])
+  | `($_ $x:term) => `([term| [$x] ])
+  | _ => throw ()
+
+
+@[app_unexpander Term.app]
+def unexpandApp: Lean.PrettyPrinter.Unexpander
+  | `($_ [term| $a] [term| $b1 $b2 ]) => `([term| $a ($b1 $b2) ])
+  | `($_ [term| fun $x:ident* => $a] [term| $b ]) => `([term| (fun $x* => $a) $b ])
+  | `($_ [term| fix $f:ident $x:ident* => $a] [term| $b ]) => `([term| (fix $f $x* => $a) $b ])
+  | `($_ [term| $a ] [term| $b ]) => `([term| $a $b ])
+  | _ => throw ()
+
+
+@[app_unexpander Term.fun]
+def unexpandFun: Lean.PrettyPrinter.Unexpander
+  | `($_ $x:str $a) =>
+    let name := Lean.mkIdent (Lean.Name.mkStr1 x.getString)
+    match a with
+    | `([term| fun $x* => $a ]) => `([term| fun $name $x* => $a ])
+    | `([term| $t ]) => `([term| fun $name => $t ])
+    | _ => throw ()
+  | _ => throw ()
+
+
+@[app_unexpander Term.fix]
+def unexpandFix: Lean.PrettyPrinter.Unexpander
+  | `($_ $f:str $x:str $a) =>
+    let name_f := Lean.mkIdent (Lean.Name.mkStr1 f.getString)
+    let name_x := Lean.mkIdent (Lean.Name.mkStr1 x.getString)
+    match a with
+    | `([term| fun $x* => $a ]) => `([term| fix $name_f $name_x $x* => $a ])
+    | `([term| $t ]) => `([term| fix $name_f $name_x => $t ])
+    | _ => throw ()
+  | _ => throw ()
+
+
+namespace TestPrettyPrinter
+open Lean Elab Command Term PrettyPrinter Delaborator
+
+/--
+Evaluate the pretty printer on a term. Since I am going to compare the result using `=`,
+the precedence of `pp` should be higher than that of `=`.
+-/
+scoped elab "pp" stx:term:51: term => do
+  let expr ← elabTerm stx none
+  let pretty ← ppExpr expr
+  let str := toString pretty
+  pure <| toExpr str
+
+def num: Val := 3
+def x: String := "x"
+
+#guard pp [term| 3] = "[term| 3 ]"
+#guard pp [term| 3] = "[term| 3 ]"
+#guard pp [term| [3]] = "3"
+#guard pp Term.val num = "[term| [num] ]"
+#guard pp Term.var x = "[term| [x] ]"
+#guard pp [term| x] = "[term| x ]"
+#guard pp [term| ["x"]] = "[term| x ]"
+#guard pp [term| [x ++ "y"] y z] = "[term| [x ++ \"y\"] y z ]"
+#guard pp [term| (x y) z] = "[term| x y z ]"
+#guard pp [term| x (y z)] = "[term| x (y z) ]"
+#guard pp [term| (fun x => x y) z] = "[term| (fun x => x y) z ]"
+#guard pp [term| fun x => (x y z)] = "[term| fun x => x y z ]"
+#guard pp [term| fun x => fun y => fun z => z] = "[term| fun x y z => z ]"
+#guard pp [term| (fun x y => fun z => z) w] = "[term| (fun x y z => z) w ]"
+#guard pp [term| (fix f x => x y) z] = "[term| (fix f x => x y) z ]"
+#guard pp [term| (fix f x y => x y) z] = "[term| (fix f x y => x y) z ]"
+#guard pp [term| (fix f x y z => x y) z] = "[term| (fix f x y z => x y) z ]"
+#guard pp [term| (fix f x => fun y => fun z => x y) z] = "[term| (fix f x y z => x y) z ]"
