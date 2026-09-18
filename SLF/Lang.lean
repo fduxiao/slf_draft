@@ -99,7 +99,7 @@ instance {n}: OfNat Term n where
 -/
 
 declare_syntax_cat slf_term (behavior := symbol)
-scoped syntax "[term| " slf_term " ]" : term
+scoped syntax "[slf| " slf_term " ]" : term
 scoped syntax " [" term "] " : slf_term
 scoped syntax " (" slf_term ") " : slf_term
 -- variable
@@ -148,145 +148,145 @@ scoped syntax:40 slf_term:40 " > " slf_term:41 : slf_term
 
 
 scoped macro_rules
-| `([term| [$t] ]) => `((($t): Term))
-| `([term| ( $t ) ]) => `([term| $t ])
-| `([term| $t:ident ]) => `(Term.var $(Lean.quote t.getId.toString))
-| `([term| $t:num ]) => `(Val.int $(Lean.quote t.getNat))
-| `([term| $t1 $t2 ]) => `(Term.app [term| $t1 ] [term| $t2 ])
-| `([term| if $t1 then $t2 else $t3 ]) => `(Term.if [term| $t1 ] [term| $t2 ] [term| $t3 ])
-| `([term| if $t1 then $t2 end ]) => `(Term.if [term| $t1 ] [term| $t2 ] (Term.val (Val.unit)))
-| `([term| $t1 ; $t2 ]) => `(Term.seq [term| $t1 ] [term| $t2 ])
-| `([term| let $x := $t1 in $t2 ]) => `(Term.let $(Lean.quote x.getId.toString) [term| $t1 ] [term| $t2 ])
-| `([term| let $x $y* := $t1 in $t2 ]) => `(Term.let $(Lean.quote x.getId.toString) [term| fun $y* => $t1 ] [term| $t2 ])
-| `([term| let rec $f $x* := $t1 in $t2 ]) => `(Term.let $(Lean.quote f.getId.toString) [term| fix $f $x* => $t1 ] [term| $t2 ])
-| `([term| fun $x => $t ]) => `(Term.fun $(Lean.quote x.getId.toString) [term| $t ])
-| `([term| fun $x1 $x2* => $t ]) => `(Term.fun $(Lean.quote x1.getId.toString) [term| fun $x2* => $t ])
-| `([term| vfun $x => $t ]) => `(Val.fun $(Lean.quote x.getId.toString) [term| $t ])
-| `([term| vfun $x1 $x2* => $t ]) => `(Val.fun $(Lean.quote x1.getId.toString) [term| fun $x2* => $t ])
-| `([term| fix $f $x => $t ]) => `(Term.fix $(Lean.quote f.getId.toString) $(Lean.quote x.getId.toString) [term| $t ])
-| `([term| fix $f $x1 $x2* => $t ]) => `(Term.fix $(Lean.quote f.getId.toString) $(Lean.quote x1.getId.toString) [term| fun $x2* => $t ])
-| `([term| vfix $f $x => $t ]) => `(Val.fix $(Lean.quote f.getId.toString) $(Lean.quote x.getId.toString) [term| $t ])
-| `([term| vfix $f $x1 $x2* => $t ]) => `(Val.fix $(Lean.quote f.getId.toString) $(Lean.quote x1.getId.toString) [term| fun $x2* => $t ])
-| `([term| unit ]) => `(Val.unit)
+| `([slf| [$t] ]) => `((($t): Term))
+| `([slf| ( $t ) ]) => `([slf| $t ])
+| `([slf| $t:ident ]) => `(Term.var $(Lean.quote t.getId.toString))
+| `([slf| $t:num ]) => `(Val.int $(Lean.quote t.getNat))
+| `([slf| $t1 $t2 ]) => `(Term.app [slf| $t1 ] [slf| $t2 ])
+| `([slf| if $t1 then $t2 else $t3 ]) => `(Term.if [slf| $t1 ] [slf| $t2 ] [slf| $t3 ])
+| `([slf| if $t1 then $t2 end ]) => `(Term.if [slf| $t1 ] [slf| $t2 ] (Term.val (Val.unit)))
+| `([slf| $t1 ; $t2 ]) => `(Term.seq [slf| $t1 ] [slf| $t2 ])
+| `([slf| let $x := $t1 in $t2 ]) => `(Term.let $(Lean.quote x.getId.toString) [slf| $t1 ] [slf| $t2 ])
+| `([slf| let $x $y* := $t1 in $t2 ]) => `(Term.let $(Lean.quote x.getId.toString) [slf| fun $y* => $t1 ] [slf| $t2 ])
+| `([slf| let rec $f $x* := $t1 in $t2 ]) => `(Term.let $(Lean.quote f.getId.toString) [slf| fix $f $x* => $t1 ] [slf| $t2 ])
+| `([slf| fun $x => $t ]) => `(Term.fun $(Lean.quote x.getId.toString) [slf| $t ])
+| `([slf| fun $x1 $x2* => $t ]) => `(Term.fun $(Lean.quote x1.getId.toString) [slf| fun $x2* => $t ])
+| `([slf| vfun $x => $t ]) => `(Val.fun $(Lean.quote x.getId.toString) [slf| $t ])
+| `([slf| vfun $x1 $x2* => $t ]) => `(Val.fun $(Lean.quote x1.getId.toString) [slf| fun $x2* => $t ])
+| `([slf| fix $f $x => $t ]) => `(Term.fix $(Lean.quote f.getId.toString) $(Lean.quote x.getId.toString) [slf| $t ])
+| `([slf| fix $f $x1 $x2* => $t ]) => `(Term.fix $(Lean.quote f.getId.toString) $(Lean.quote x1.getId.toString) [slf| fun $x2* => $t ])
+| `([slf| vfix $f $x => $t ]) => `(Val.fix $(Lean.quote f.getId.toString) $(Lean.quote x.getId.toString) [slf| $t ])
+| `([slf| vfix $f $x1 $x2* => $t ]) => `(Val.fix $(Lean.quote f.getId.toString) $(Lean.quote x1.getId.toString) [slf| fun $x2* => $t ])
+| `([slf| unit ]) => `(Val.unit)
 -- primitives
-| `([term| ref ]) => `(Val.prim Prim.ref)
-| `([term| free ]) => `(Val.prim Prim.free)
-| `([term| not ]) => `(Val.prim Prim.neg)
-| `([term| ! $t ]) => `(Term.app (Prim.get) [term| $t ])
-| `([term| $t1:ident := $t2 ]) => `(Term.app (Term.app Prim.set [term| $t1:ident ]) [term| $t2 ])
-| `([term| [$t1] := $t2 ]) => `(Term.app (Term.app Prim.set [term| [$t1] ]) [term| $t2 ])
-| `([term| $t1 + $t2 ]) => `(Term.app (Term.app Prim.add [term| $t1 ]) [term| $t2 ])
-| `([term| - $t ]) => `(Term.app Prim.opp [term| $t ])
-| `([term| $t1 - $t2 ]) => `(Term.app (Term.app Prim.sub [term| $t1 ]) [term| $t2 ])
-| `([term| $t1 * $t2 ]) => `(Term.app (Term.app Prim.mul [term| $t1 ]) [term| $t2 ])
-| `([term| $t1 / $t2 ]) => `(Term.app (Term.app Prim.div [term| $t1 ]) [term| $t2 ])
-| `([term| $t1 % $t2 ]) => `(Term.app (Term.app Prim.mod [term| $t1 ]) [term| $t2 ])
-| `([term| $t1 == $t2 ]) => `(Term.app (Term.app Prim.eq [term| $t1 ]) [term| $t2 ])
-| `([term| $t1 != $t2 ]) => `(Term.app (Term.app Prim.neq [term| $t1 ]) [term| $t2 ])
-| `([term| $t1 <= $t2 ]) => `(Term.app (Term.app Prim.le [term| $t1 ]) [term| $t2 ])
-| `([term| $t1 < $t2 ]) => `(Term.app (Term.app Prim.lt [term| $t1 ]) [term| $t2 ])
-| `([term| $t1 >= $t2 ]) => `(Term.app (Term.app Prim.ge [term| $t1 ]) [term| $t2 ])
-| `([term| $t1 > $t2 ]) => `(Term.app (Term.app Prim.gt [term| $t1 ]) [term| $t2 ])
+| `([slf| ref ]) => `(Val.prim Prim.ref)
+| `([slf| free ]) => `(Val.prim Prim.free)
+| `([slf| not ]) => `(Val.prim Prim.neg)
+| `([slf| ! $t ]) => `(Term.app (Prim.get) [slf| $t ])
+| `([slf| $t1:ident := $t2 ]) => `(Term.app (Term.app Prim.set [slf| $t1:ident ]) [slf| $t2 ])
+| `([slf| [$t1] := $t2 ]) => `(Term.app (Term.app Prim.set [slf| [$t1] ]) [slf| $t2 ])
+| `([slf| $t1 + $t2 ]) => `(Term.app (Term.app Prim.add [slf| $t1 ]) [slf| $t2 ])
+| `([slf| - $t ]) => `(Term.app Prim.opp [slf| $t ])
+| `([slf| $t1 - $t2 ]) => `(Term.app (Term.app Prim.sub [slf| $t1 ]) [slf| $t2 ])
+| `([slf| $t1 * $t2 ]) => `(Term.app (Term.app Prim.mul [slf| $t1 ]) [slf| $t2 ])
+| `([slf| $t1 / $t2 ]) => `(Term.app (Term.app Prim.div [slf| $t1 ]) [slf| $t2 ])
+| `([slf| $t1 % $t2 ]) => `(Term.app (Term.app Prim.mod [slf| $t1 ]) [slf| $t2 ])
+| `([slf| $t1 == $t2 ]) => `(Term.app (Term.app Prim.eq [slf| $t1 ]) [slf| $t2 ])
+| `([slf| $t1 != $t2 ]) => `(Term.app (Term.app Prim.neq [slf| $t1 ]) [slf| $t2 ])
+| `([slf| $t1 <= $t2 ]) => `(Term.app (Term.app Prim.le [slf| $t1 ]) [slf| $t2 ])
+| `([slf| $t1 < $t2 ]) => `(Term.app (Term.app Prim.lt [slf| $t1 ]) [slf| $t2 ])
+| `([slf| $t1 >= $t2 ]) => `(Term.app (Term.app Prim.ge [slf| $t1 ]) [slf| $t2 ])
+| `([slf| $t1 > $t2 ]) => `(Term.app (Term.app Prim.gt [slf| $t1 ]) [slf| $t2 ])
 
-example: [term| p.a] = Term.var "p.a" := rfl
-example: [term| !p] = Term.app Prim.get (Term.var "p") := rfl
-example: [term| !["x"]] = Term.app Prim.get (Term.var "x") := rfl
-example: [term| (!["x"]) ; (!["y"])] =
+example: [slf| p.a] = Term.var "p.a" := rfl
+example: [slf| !p] = Term.app Prim.get (Term.var "p") := rfl
+example: [slf| !["x"]] = Term.app Prim.get (Term.var "x") := rfl
+example: [slf| (!["x"]) ; (!["y"])] =
   Term.seq
   (Term.app Prim.get "x")
   (Term.app Prim.get "y")
 := rfl
-example: [term| !(["x"] ; !["y"])] =
+example: [slf| !(["x"] ; !["y"])] =
   Term.app
   Prim.get
   (.seq "x" $ Term.app Prim.get "y")
 := rfl
-example: [term| !x ; !y] =
+example: [slf| !x ; !y] =
   Term.seq
   (.app Prim.get "x")
   (.app Prim.get "y")
 := rfl
-example: [term| !["x"] ; !y] =
+example: [slf| !["x"] ; !y] =
   Term.seq
   (.app Prim.get "x")
   (.app Prim.get "y")
 := rfl
-example: [term| if !x then y else !z] =
+example: [slf| if !x then y else !z] =
   Term.if
   (.app Prim.get "x")
   "y"
   (.app Prim.get "z")
 := rfl
-example: [term| if !x then y; z else !z] =
+example: [slf| if !x then y; z else !z] =
   Term.if
   (.app Prim.get "x")
   (.seq "y" "z")
   (.app Prim.get "z")
 := rfl
-example: [term| let x := !y in z] =
+example: [slf| let x := !y in z] =
   Term.let "x" (.app Prim.get "y") "z"
 := rfl
-example: [term| fun x => y z] =
+example: [slf| fun x => y z] =
   Term.fun "x" (.app "y" "z")
 := rfl
-example: [term| (fun x => y) z] =
+example: [slf| (fun x => y) z] =
   Term.app (Term.fun "x" "y") "z"
 := rfl
-example: [term| fun x => y] =
+example: [slf| fun x => y] =
   Term.fun "x" "y"
 := rfl
-example: [term| fun x y => z] =
+example: [slf| fun x y => z] =
   Term.fun "x" (Term.fun "y" "z")
 := rfl
-example: [term| fun x y z => w] =
+example: [slf| fun x y z => w] =
   Term.fun "x" (Term.fun "y" (Term.fun "z" "w"))
 := rfl
-example: [term| let f x := z in f w] =
+example: [slf| let f x := z in f w] =
   Term.let "f" (Term.fun "x" "z") (.app "f" "w")
 := rfl
-example: [term| fix f x => y] =
+example: [slf| fix f x => y] =
   Term.fix "f" "x" "y"
 := rfl
-example: [term| fix f x z w => y] =
+example: [slf| fix f x z w => y] =
   Term.fix "f" "x" (Term.fun "z" (Term.fun "w" "y"))
 := rfl
-example: [term| vfix f x => y] =
+example: [slf| vfix f x => y] =
   Val.fix "f" "x" "y"
 := rfl
-example: [term| let rec f x := y in z] =
+example: [slf| let rec f x := y in z] =
   Term.let "f" (.fix "f" "x" "y") "z"
 := rfl
-example: [term| let rec f x y := y in z] =
+example: [slf| let rec f x y := y in z] =
   Term.let "f" (.fix "f" "x" (.fun "y" "y")) "z"
 := rfl
-example: [term| let rec f x y := y in [let x := "x"; x ++ "y"] := z] =
+example: [slf| let rec f x y := y in [let x := "x"; x ++ "y"] := z] =
   Term.let "f" (.fix "f" "x" (.fun "y" "y")) (.app (.app Prim.set "xy") "z")
 := rfl
-example: [term| x + y + z] =
+example: [slf| x + y + z] =
   Term.app (.app Prim.add (.app (.app Prim.add "x") "y")) "z"
 := rfl
-example: [term| x + t * z] =
+example: [slf| x + t * z] =
   Term.app (.app Prim.add "x") (.app (.app Prim.mul "t") "z")
 := rfl
-example: [term| -(x + y)] = Term.app Prim.opp
+example: [slf| -(x + y)] = Term.app Prim.opp
   (.app (.app Prim.add "x") "y")
 := rfl
-example: [term| -x + y] =
+example: [slf| -x + y] =
   Term.app (.app Prim.add (Term.app Prim.opp "x")) "y"
 := rfl
-example: [term| -x * y] = Term.app Prim.opp
+example: [slf| -x * y] = Term.app Prim.opp
   (.app (.app Prim.mul "x") "y")
 := rfl
-example: [term| (-x) * y] =
+example: [slf| (-x) * y] =
   Term.app (.app Prim.mul (.app Prim.opp "x")) "y"
 := rfl
-example: [term| (x + t) * z] =
+example: [slf| (x + t) * z] =
   Term.app (.app Prim.mul (.app (.app Prim.add "x") "t")) "z"
 := rfl
-example: [term| x + t * z - y] =
+example: [slf| x + t * z - y] =
   Term.app (.app Prim.sub (.app (.app Prim.add "x") (.app (.app Prim.mul "t") "z"))) "y"
 := rfl
-example: [term| x + - t * z - y % z] =
+example: [slf| x + - t * z - y % z] =
   Term.app
     (.app Prim.sub
       (.app (.app Prim.add "x")
@@ -295,20 +295,20 @@ example: [term| x + - t * z - y % z] =
     (.app (.app Prim.mod "y") "z")
 := rfl
 -- test comparison operators
-example: [term| x == y == z] =
+example: [slf| x == y == z] =
   Term.app (.app Prim.eq (.app (.app Prim.eq "x") "y")) "z"
 := rfl
-example: [term| x != y] =
+example: [slf| x != y] =
   Term.app (.app Prim.neq "x") "y"
 := rfl
-example: [term| x * w <= y + z] =
+example: [slf| x * w <= y + z] =
   Term.app (.app Prim.le (.app (.app Prim.mul "x") "w")) (.app (.app Prim.add "y") "z")
 := rfl
-example {f}: [term| let f x := x in [f] < y < z] =
+example {f}: [slf| let f x := x in [f] < y < z] =
   Term.let "f" (.fun "x" "x") (.app (.app Prim.lt (.app (.app Prim.lt f) "y")) "z")
 := rfl
 
-example: [term| let f x := x + 3 in f < y < z] =
+example: [slf| let f x := x + 3 in f < y < z] =
   Term.let "f" (.fun "x" (.app (.app Prim.add "x") 3)) (.app (.app Prim.lt (.app (.app Prim.lt "f") "y")) "z")
 := rfl
 
@@ -322,33 +322,33 @@ open Lean Elab Command Term PrettyPrinter Delaborator
 
 @[app_unexpander Val.int]
 def unexpandValInt: Unexpander
-  | `($_ $x:num ) => `([term| $x:num])
+  | `($_ $x:num ) => `([slf| $x:num])
   | _ => throw ()
 
 
 @[app_unexpander Val.unit]
 def unexpandValUnit: Unexpander
-  | `($_) => `([term| unit ])
+  | `($_) => `([slf| unit ])
 
 
 @[app_unexpander Val.fun]
 def unexpandValFun: Unexpander
-  | `($_ $x:str [term| $b]) =>
+  | `($_ $x:str [slf| $b]) =>
     let name := mkIdent (Lean.Name.mkStr1 x.getString)
     match b with
-    | `(slf_term| fun $x* => $b) => `([term| vfun $name $x* => $b ])
-    | `(slf_term| $t ) => `([term| vfun $name => $t ])
+    | `(slf_term| fun $x* => $b) => `([slf| vfun $name $x* => $b ])
+    | `(slf_term| $t ) => `([slf| vfun $name => $t ])
   | _ => throw ()
 
 
 @[app_unexpander Val.fix]
 def unexpandValFix: Unexpander
-  | `($_ $f:str $x:str [term| $b]) =>
+  | `($_ $f:str $x:str [slf| $b]) =>
     let name_f := mkIdent (Lean.Name.mkStr1 f.getString)
     let name_x := mkIdent (Lean.Name.mkStr1 x.getString)
     match b with
-    | `(slf_term| fun $x* => $b) => `([term| vfix $name_f $name_x $x* => $b ])
-    | `(slf_term| $t ) => `([term| vfix $name_f $name_x => $t ])
+    | `(slf_term| fun $x* => $b) => `([slf| vfix $name_f $name_x $x* => $b ])
+    | `(slf_term| $t ) => `([slf| vfix $name_f $name_x => $t ])
   | _ => throw ()
 
 
@@ -356,9 +356,9 @@ def unexpandValFix: Unexpander
 def unexpandValPrim: Unexpander
   | `($_ $p) =>
     match p with
-    | `(Prim.ref) => `([term| ref ])
-    | `(Prim.free) => `([term| free ])
-    | `(Prim.neg) => `([term| not ])
+    | `(Prim.ref) => `([slf| ref ])
+    | `(Prim.free) => `([slf| free ])
+    | `(Prim.neg) => `([slf| not ])
     | _ => throw ()
   | _ => throw ()
 
@@ -367,19 +367,19 @@ def unexpandValPrim: Unexpander
 def unexpandVar: Unexpander
   | `($_ $x:str) =>
     let name := mkIdent (Lean.Name.mkStr1 x.getString)
-    `([term| $name:ident ])
-  | `($_ $x:term) => `([term| [$x] ])
+    `([slf| $name:ident ])
+  | `($_ $x:term) => `([slf| [$x] ])
   | _ => throw ()
 
 
 @[app_unexpander Term.val]
 def unexpandVal: Unexpander
-  | `($_ [term| $n:num ]) => `([term| $n:num])
-  | `($_ $x:num) => `([term| $x:num])
-  | `($_ [term| unit ]) => `([term| unit ])
-  | `($_ [term| vfun $x* => $t ]) => `([term| vfun $x* => $t ])
-  | `($_ [term| vfix $f $x* => $t ]) => `([term| vfix $f $x* => $t ])
-  | `($_ $x:term) => `([term| [$x] ])
+  | `($_ [slf| $n:num ]) => `([slf| $n:num])
+  | `($_ $x:num) => `([slf| $x:num])
+  | `($_ [slf| unit ]) => `([slf| unit ])
+  | `($_ [slf| vfun $x* => $t ]) => `([slf| vfun $x* => $t ])
+  | `($_ [slf| vfix $f $x* => $t ]) => `([slf| vfix $f $x* => $t ])
+  | `($_ $x:term) => `([slf| [$x] ])
   | _ => throw ()
 
 
@@ -439,76 +439,76 @@ def higherThanLe: TSyntax `slf_term → Bool
 
 @[app_unexpander Term.app]
 def unexpandApp: Unexpander
-  | `($_ [term| $f] [term| $a ]) => do
+  | `($_ [slf| $f] [slf| $a ]) => do
     let a' ← unexpandAppArg a
     let f' ← unexpandAppFun f
     let t ← `(slf_term|$f' $a')
     match t with
-    | `(slf_term| [Val.prim Prim.get] $a) => `([term| ! $a ])
-    | `(slf_term| [Val.prim Prim.set] $a:ident $b) => `([term| $a:ident := $b ])
-    | `(slf_term| [Val.prim Prim.set] [$t] $b) => `([term| [$t] := $b ])
+    | `(slf_term| [Val.prim Prim.get] $a) => `([slf| ! $a ])
+    | `(slf_term| [Val.prim Prim.set] $a:ident $b) => `([slf| $a:ident := $b ])
+    | `(slf_term| [Val.prim Prim.set] [$t] $b) => `([slf| [$t] := $b ])
     | `(slf_term| [Val.prim Prim.opp] $a) =>
-      if higherThanMul a then `([term| - $a ]) else `([term| - ($a) ])
+      if higherThanMul a then `([slf| - $a ]) else `([slf| - ($a) ])
     | `(slf_term| [Val.prim Prim.add] $a $b) =>
       let a' ← if higherThanAdd a then `(slf_term| $a) else wrapAddLeft a
       let b' ← if higherThanAdd b then `(slf_term| $b) else `(slf_term| ($b))
-      `([term| $a' + $b' ])
+      `([slf| $a' + $b' ])
     | `(slf_term| [Val.prim Prim.sub] $a $b) =>
       let a' ← if higherThanAdd a then `(slf_term| $a) else wrapAddLeft a
       let b' ← if higherThanAdd b then `(slf_term| $b) else `(slf_term| ($b))
-      `([term| $a' - $b' ])
+      `([slf| $a' - $b' ])
     | `(slf_term| [Val.prim Prim.mul] $a $b) =>
       let a' ← if higherThanMul a then `(slf_term| $a) else wrapMulLeft a
       let b' ← if higherThanMul b then `(slf_term| $b) else `(slf_term| ($b))
-      `([term| $a' * $b' ])
+      `([slf| $a' * $b' ])
     | `(slf_term| [Val.prim Prim.div] $a $b) =>
       let a' ← if higherThanMul a then `(slf_term| $a) else wrapMulLeft a
       let b' ← if higherThanMul b then `(slf_term| $b) else `(slf_term| ($b))
-      `([term| $a' / $b' ])
+      `([slf| $a' / $b' ])
     | `(slf_term| [Val.prim Prim.mod] $a $b) =>
       let a' ← if higherThanMul a then `(slf_term| $a) else wrapMulLeft a
       let b' ← if higherThanMul b then `(slf_term| $b) else `(slf_term| ($b))
-      `([term| $a' % $b' ])
+      `([slf| $a' % $b' ])
     | `(slf_term| [Val.prim Prim.eq] $a $b) =>
       let a' ← if higherThanEq a then `(slf_term| $a) else `(slf_term| ($a))
       let b' ← if higherThanEq b then `(slf_term| $b) else `(slf_term| ($b))
-      `([term| $a' == $b' ])
+      `([slf| $a' == $b' ])
     | `(slf_term| [Val.prim Prim.neq] $a $b) =>
       let a' ← if higherThanEq a then `(slf_term| $a) else `(slf_term| ($a))
       let b' ← if higherThanEq b then `(slf_term| $b) else `(slf_term| ($b))
-      `([term| $a' != $b' ])
+      `([slf| $a' != $b' ])
     | `(slf_term| [Val.prim Prim.le] $a $b) =>
       let a' ← if higherThanLe a then `(slf_term| $a) else `(slf_term| ($a))
       let b' ← if higherThanLe b then `(slf_term| $b) else `(slf_term| ($b))
-      `([term| $a' <= $b' ])
+      `([slf| $a' <= $b' ])
     | `(slf_term| [Val.prim Prim.lt] $a $b) =>
       let a' ← if higherThanLe a then `(slf_term| $a) else `(slf_term| ($a))
       let b' ← if higherThanLe b then `(slf_term| $b) else `(slf_term| ($b))
-      `([term| $a' < $b' ])
+      `([slf| $a' < $b' ])
     | `(slf_term| [Val.prim Prim.ge] $a $b) =>
       let a' ← if higherThanLe a then `(slf_term| $a) else `(slf_term| ($a))
       let b' ← if higherThanLe b then `(slf_term| $b) else `(slf_term| ($b))
-      `([term| $a' >= $b' ])
+      `([slf| $a' >= $b' ])
     | `(slf_term| [Val.prim Prim.gt] $a $b) =>
       let a' ← if higherThanLe a then `(slf_term| $a) else `(slf_term| ($a))
       let b' ← if higherThanLe b then `(slf_term| $b) else `(slf_term| ($b))
-      `([term| $a' > $b' ])
-    | t => `([term| $t ])
+      `([slf| $a' > $b' ])
+    | t => `([slf| $t ])
   | _ => throw ()
 
 
 @[app_unexpander Term.if]
 def unexpandIf: Unexpander
-  | `($_ [term| $cond] [term| $t] [term| $f]) =>
+  | `($_ [slf| $cond] [slf| $t] [slf| $f]) =>
     match f with
-    | `(slf_term| unit ) => `([term| if $cond then $t end ])
-    | `(slf_term| $f) => `([term| if $cond then $t else $f ])
+    | `(slf_term| unit ) => `([slf| if $cond then $t end ])
+    | `(slf_term| $f) => `([slf| if $cond then $t else $f ])
   | _ => throw ()
 
 
 @[app_unexpander Term.seq]
 def unexpandSeq: Unexpander
-  | `($_ [term| $a] [term| $b ]) => `([term| $a; $b ])
+  | `($_ [slf| $a] [slf| $b ]) => `([slf| $a; $b ])
   | _ => throw ()
 
 
@@ -517,8 +517,8 @@ def unexpandFun: Unexpander
   | `($_ $x:str $a) =>
     let name := mkIdent (Lean.Name.mkStr1 x.getString)
     match a with
-    | `([term| fun $x* => $a ]) => `([term| fun $name $x* => $a ])
-    | `([term| $t ]) => `([term| fun $name => $t ])
+    | `([slf| fun $x* => $a ]) => `([slf| fun $name $x* => $a ])
+    | `([slf| $t ]) => `([slf| fun $name => $t ])
     | _ => throw ()
   | _ => throw ()
 
@@ -529,20 +529,20 @@ def unexpandFix: Unexpander
     let name_f := mkIdent (Lean.Name.mkStr1 f.getString)
     let name_x := mkIdent (Lean.Name.mkStr1 x.getString)
     match a with
-    | `([term| fun $x* => $a ]) => `([term| fix $name_f $name_x $x* => $a ])
-    | `([term| $t ]) => `([term| fix $name_f $name_x => $t ])
+    | `([slf| fun $x* => $a ]) => `([slf| fix $name_f $name_x $x* => $a ])
+    | `([slf| $t ]) => `([slf| fix $name_f $name_x => $t ])
     | _ => throw ()
   | _ => throw ()
 
 
 @[app_unexpander Term.let]
 def unexpandLet: Unexpander
-  | `($_ $x:str [term| $v ] [term| $b ]) =>
+  | `($_ $x:str [slf| $v ] [slf| $b ]) =>
     let name := mkIdent (Lean.Name.mkStr1 x.getString)
     match v with
-    | `(slf_term| fun $x* => $v ) => `([term| let $name $x* := $v in $b ])
-    | `(slf_term| fix $_ $x* => $v ) => `([term| let rec $name $x* := $v in $b ])
-    | `(slf_term| $v ) => `([term| let $name := $v in $b ])
+    | `(slf_term| fun $x* => $v ) => `([slf| let $name $x* := $v in $b ])
+    | `(slf_term| fix $_ $x* => $v ) => `([slf| let rec $name $x* := $v in $b ])
+    | `(slf_term| $v ) => `([slf| let $name := $v in $b ])
   | _ => throw ()
 
 scoped elab "slf_pp" stx:term:51: term => do
@@ -564,94 +564,94 @@ def num: Val := 3
 def x: String := "x"
 
 -- values
-#guard slf_pp Val.int 3 = "[term| 3 ]"
-#guard slf_pp [term| 3] = "[term| 3 ]"
-#guard slf_pp [term| [3]] = "3"  -- ofNat is just a `3`
-#guard slf_pp ([term| 3] : Term) = "[term| 3 ]"
-#guard slf_pp Term.val num = "[term| [num] ]"
-#guard slf_pp Val.unit = "[term| unit ]"
-#guard slf_pp Term.val Val.unit = "[term| unit ]"
-#guard slf_pp [term| unit] = "[term| unit ]"
-#guard slf_pp ([term| unit]: Term) = "[term| unit ]"
-#guard slf_pp Val.fun "x" [term| x] = "[term| vfun x => x ]"
-#guard slf_pp [term| vfun a => b] = "[term| vfun a => b ]"
-#guard slf_pp ([term| vfun a => b]: Term) = "[term| vfun a => b ]"
-#guard slf_pp [term| vfun x => fun y => fun z => z] = "[term| vfun x y z => z ]"
-#guard slf_pp Val.fix "f" "x" [term| x] = "[term| vfix f x => x ]"
-#guard slf_pp [term| vfix f a => b] = "[term| vfix f a => b ]"
-#guard slf_pp ([term| vfix f a => b]: Term) = "[term| vfix f a => b ]"
-#guard slf_pp [term| vfix f a => fun b => c] = "[term| vfix f a b => c ]"
+#guard slf_pp Val.int 3 = "[slf| 3 ]"
+#guard slf_pp [slf| 3] = "[slf| 3 ]"
+#guard slf_pp [slf| [3]] = "3"  -- ofNat is just a `3`
+#guard slf_pp ([slf| 3] : Term) = "[slf| 3 ]"
+#guard slf_pp Term.val num = "[slf| [num] ]"
+#guard slf_pp Val.unit = "[slf| unit ]"
+#guard slf_pp Term.val Val.unit = "[slf| unit ]"
+#guard slf_pp [slf| unit] = "[slf| unit ]"
+#guard slf_pp ([slf| unit]: Term) = "[slf| unit ]"
+#guard slf_pp Val.fun "x" [slf| x] = "[slf| vfun x => x ]"
+#guard slf_pp [slf| vfun a => b] = "[slf| vfun a => b ]"
+#guard slf_pp ([slf| vfun a => b]: Term) = "[slf| vfun a => b ]"
+#guard slf_pp [slf| vfun x => fun y => fun z => z] = "[slf| vfun x y z => z ]"
+#guard slf_pp Val.fix "f" "x" [slf| x] = "[slf| vfix f x => x ]"
+#guard slf_pp [slf| vfix f a => b] = "[slf| vfix f a => b ]"
+#guard slf_pp ([slf| vfix f a => b]: Term) = "[slf| vfix f a => b ]"
+#guard slf_pp [slf| vfix f a => fun b => c] = "[slf| vfix f a b => c ]"
 
 -- terms
-#guard slf_pp Term.var x = "[term| [x] ]"
-#guard slf_pp [term| x] = "[term| x ]"
-#guard slf_pp [term| ["x"]] = "[term| x ]"
-#guard slf_pp [term| [x ++ "y"] y z] = "[term| [x ++ \"y\"] y z ]"
-#guard slf_pp [term| (x y) z] = "[term| x y z ]"
-#guard slf_pp [term| x (y z)] = "[term| x (y z) ]"
-#guard slf_pp [term| x (y (z w))] = "[term| x (y (z w) ) ]"
-#guard slf_pp [term| x (y z) w] = "[term| x (y z) w ]"
-#guard slf_pp [term| x y z w] = "[term| x y z w ]"
-#guard slf_pp [term| [x] y z w] = "[term| [x] y z w ]"
-#guard slf_pp [term| [x] y [x] w] = "[term| [x] y [x] w ]"
-#guard slf_pp [term| [x] (y [x]) w] = "[term| [x] (y [x] ) w ]"
-#guard slf_pp [term| if x then y else z] = "[term| if x then y else z ]"
-#guard slf_pp [term| if x then y end] = "[term| if x then y end ]"
-#guard slf_pp [term| if [x] then y; z else w] = "[term| if [x] then y; z else w ]"
-#guard slf_pp [term| (fun x => x y) z] = "[term| (fun x => x y) z ]"
-#guard slf_pp [term| fun x => (x y z)] = "[term| fun x => x y z ]"
-#guard slf_pp [term| fun x => fun y => fun z => z] = "[term| fun x y z => z ]"
-#guard slf_pp [term| (fun x y => fun z => z) w] = "[term| (fun x y z => z) w ]"
-#guard slf_pp [term| if [x] then y; z else w] = "[term| if [x] then y; z else w ]"
-#guard slf_pp [term| (if [x] then y; z else w) c] = "[term| (if [x] then y; z else w) c ]"
-#guard slf_pp [term| (fix f x => x y) z] = "[term| (fix f x => x y) z ]"
-#guard slf_pp [term| (fix f x y => x y) z] = "[term| (fix f x y => x y) z ]"
-#guard slf_pp [term| (fix f x y z => x y) z] = "[term| (fix f x y z => x y) z ]"
-#guard slf_pp [term| (fix f x => fun y => fun z => x y) z] = "[term| (fix f x y z => x y) z ]"
-#guard slf_pp [term| (fix f x => fun y => fun z => x y) z] = "[term| (fix f x y z => x y) z ]"
-#guard slf_pp [term| (fix f x => fun y => if x then y; fun z => x y else z) z] = "[term| (fix f x y => if x then y; fun z => x y else z) z ]"
+#guard slf_pp Term.var x = "[slf| [x] ]"
+#guard slf_pp [slf| x] = "[slf| x ]"
+#guard slf_pp [slf| ["x"]] = "[slf| x ]"
+#guard slf_pp [slf| [x ++ "y"] y z] = "[slf| [x ++ \"y\"] y z ]"
+#guard slf_pp [slf| (x y) z] = "[slf| x y z ]"
+#guard slf_pp [slf| x (y z)] = "[slf| x (y z) ]"
+#guard slf_pp [slf| x (y (z w))] = "[slf| x (y (z w) ) ]"
+#guard slf_pp [slf| x (y z) w] = "[slf| x (y z) w ]"
+#guard slf_pp [slf| x y z w] = "[slf| x y z w ]"
+#guard slf_pp [slf| [x] y z w] = "[slf| [x] y z w ]"
+#guard slf_pp [slf| [x] y [x] w] = "[slf| [x] y [x] w ]"
+#guard slf_pp [slf| [x] (y [x]) w] = "[slf| [x] (y [x] ) w ]"
+#guard slf_pp [slf| if x then y else z] = "[slf| if x then y else z ]"
+#guard slf_pp [slf| if x then y end] = "[slf| if x then y end ]"
+#guard slf_pp [slf| if [x] then y; z else w] = "[slf| if [x] then y; z else w ]"
+#guard slf_pp [slf| (fun x => x y) z] = "[slf| (fun x => x y) z ]"
+#guard slf_pp [slf| fun x => (x y z)] = "[slf| fun x => x y z ]"
+#guard slf_pp [slf| fun x => fun y => fun z => z] = "[slf| fun x y z => z ]"
+#guard slf_pp [slf| (fun x y => fun z => z) w] = "[slf| (fun x y z => z) w ]"
+#guard slf_pp [slf| if [x] then y; z else w] = "[slf| if [x] then y; z else w ]"
+#guard slf_pp [slf| (if [x] then y; z else w) c] = "[slf| (if [x] then y; z else w) c ]"
+#guard slf_pp [slf| (fix f x => x y) z] = "[slf| (fix f x => x y) z ]"
+#guard slf_pp [slf| (fix f x y => x y) z] = "[slf| (fix f x y => x y) z ]"
+#guard slf_pp [slf| (fix f x y z => x y) z] = "[slf| (fix f x y z => x y) z ]"
+#guard slf_pp [slf| (fix f x => fun y => fun z => x y) z] = "[slf| (fix f x y z => x y) z ]"
+#guard slf_pp [slf| (fix f x => fun y => fun z => x y) z] = "[slf| (fix f x y z => x y) z ]"
+#guard slf_pp [slf| (fix f x => fun y => if x then y; fun z => x y else z) z] = "[slf| (fix f x y => if x then y; fun z => x y else z) z ]"
 -- let rules
-#guard slf_pp [term| let x := y in z] = "[term| let x := y in z ]"
-#guard slf_pp [term| let x y := z in w] = "[term| let x y := z in w ]"
-#guard slf_pp [term| let rec f x := y in z] = "[term| let rec f x := y in z ]"
-#guard slf_pp [term| let rec f x y := z in w] = "[term| let rec f x y := z in w ]"
-#guard slf_pp [term| let rec f x y := z in [x] w] = "[term| let rec f x y := z in [x] w ]"
+#guard slf_pp [slf| let x := y in z] = "[slf| let x := y in z ]"
+#guard slf_pp [slf| let x y := z in w] = "[slf| let x y := z in w ]"
+#guard slf_pp [slf| let rec f x := y in z] = "[slf| let rec f x := y in z ]"
+#guard slf_pp [slf| let rec f x y := z in w] = "[slf| let rec f x y := z in w ]"
+#guard slf_pp [slf| let rec f x y := z in [x] w] = "[slf| let rec f x y := z in [x] w ]"
 -- primitives
 -- `ref`, `free`, `not` are printed as is
 def prim := Val.prim Prim.get
 #guard slf_pp prim = "prim"
-#guard slf_pp [term| [prim]] = "[term| [prim] ]"
-#guard slf_pp [term| ref] = "[term| ref ]"
-#guard slf_pp [term| free] = "[term| free ]"
-#guard slf_pp [term| not] = "[term| not ]"
+#guard slf_pp [slf| [prim]] = "[slf| [prim] ]"
+#guard slf_pp [slf| ref] = "[slf| ref ]"
+#guard slf_pp [slf| free] = "[slf| free ]"
+#guard slf_pp [slf| not] = "[slf| not ]"
 -- the rest must be application of the primitive to its arguments
 -- get
-#guard slf_pp (Term.app (Val.prim Prim.get) x) = "[term| ! [x] ]"
-#guard slf_pp [term| !x] = "[term| !x ]"
-#guard slf_pp [term| !!x] = "[term| !!x ]"
-#guard slf_pp [term| ! x (x y)] = "[term| ! (x (x y) ) ]"
-#guard slf_pp [term| ! x x y] = "[term| ! (x x y) ]"
+#guard slf_pp (Term.app (Val.prim Prim.get) x) = "[slf| ! [x] ]"
+#guard slf_pp [slf| !x] = "[slf| !x ]"
+#guard slf_pp [slf| !!x] = "[slf| !!x ]"
+#guard slf_pp [slf| ! x (x y)] = "[slf| ! (x (x y) ) ]"
+#guard slf_pp [slf| ! x x y] = "[slf| ! (x x y) ]"
 -- assign
-#guard slf_pp (Term.app (Term.app (Val.prim Prim.set) x) "y") = "[term| [x] := y ]"
+#guard slf_pp (Term.app (Term.app (Val.prim Prim.set) x) "y") = "[slf| [x] := y ]"
 -- arithmetic
-#guard slf_pp (Term.app (Term.app (Val.prim Prim.add) x) "y") = "[term| [x] + y ]"
-#guard slf_pp [term| (x := y) + y] = "[term| (x := y) + y ]"
-#guard slf_pp [term| (x + y) + z] = "[term| x + y + z ]"
-#guard slf_pp [term| x + (y + z)] = "[term| x + (y + z) ]"
-#guard slf_pp [term| x - (y + z)] = "[term| x - (y + z) ]"
-#guard slf_pp [term| x - y - z] = "[term| x - y - z ]"
-#guard slf_pp [term| x - -y - z] = "[term| x - -y - z ]"
-#guard slf_pp [term| x * (y * z)] = "[term| x * (y * z) ]"
-#guard slf_pp [term| x * y * z] = "[term| x * y * z ]"
-#guard slf_pp [term| x * (y + z)] = "[term| x * (y + z) ]"
-#guard slf_pp [term| x * y + z] = "[term| x * y + z ]"
-#guard slf_pp [term| x * (-y) + z] = "[term| x * (-y) + z ]"
-#guard slf_pp [term| -x * y + z] = "[term| - (x * y) + z ]"
-#guard slf_pp [term| (-x) * y + z] = "[term| (-x) * y + z ]"
-#guard slf_pp [term| -x + y == z] = "[term| -x + y == z ]"
-#guard slf_pp [term| -x + (y != z)] = "[term| -x + (y != z) ]"
-#guard slf_pp [term| -x + (y <= z)] = "[term| -x + (y <= z) ]"
-#guard slf_pp [term| -x + (y < z)] = "[term| -x + (y < z) ]"
-#guard slf_pp [term| -[x] + (y >= z)] = "[term| - [x] + (y >= z) ]"
-#guard slf_pp [term| [num] + (y >= z)] = "[term| [num] + (y >= z) ]"
-#guard slf_pp [term| (x := 3) <= (y > z)] = "[term| (x := 3) <= (y > z) ]"
+#guard slf_pp (Term.app (Term.app (Val.prim Prim.add) x) "y") = "[slf| [x] + y ]"
+#guard slf_pp [slf| (x := y) + y] = "[slf| (x := y) + y ]"
+#guard slf_pp [slf| (x + y) + z] = "[slf| x + y + z ]"
+#guard slf_pp [slf| x + (y + z)] = "[slf| x + (y + z) ]"
+#guard slf_pp [slf| x - (y + z)] = "[slf| x - (y + z) ]"
+#guard slf_pp [slf| x - y - z] = "[slf| x - y - z ]"
+#guard slf_pp [slf| x - -y - z] = "[slf| x - -y - z ]"
+#guard slf_pp [slf| x * (y * z)] = "[slf| x * (y * z) ]"
+#guard slf_pp [slf| x * y * z] = "[slf| x * y * z ]"
+#guard slf_pp [slf| x * (y + z)] = "[slf| x * (y + z) ]"
+#guard slf_pp [slf| x * y + z] = "[slf| x * y + z ]"
+#guard slf_pp [slf| x * (-y) + z] = "[slf| x * (-y) + z ]"
+#guard slf_pp [slf| -x * y + z] = "[slf| - (x * y) + z ]"
+#guard slf_pp [slf| (-x) * y + z] = "[slf| (-x) * y + z ]"
+#guard slf_pp [slf| -x + y == z] = "[slf| -x + y == z ]"
+#guard slf_pp [slf| -x + (y != z)] = "[slf| -x + (y != z) ]"
+#guard slf_pp [slf| -x + (y <= z)] = "[slf| -x + (y <= z) ]"
+#guard slf_pp [slf| -x + (y < z)] = "[slf| -x + (y < z) ]"
+#guard slf_pp [slf| -[x] + (y >= z)] = "[slf| - [x] + (y >= z) ]"
+#guard slf_pp [slf| [num] + (y >= z)] = "[slf| [num] + (y >= z) ]"
+#guard slf_pp [slf| (x := 3) <= (y > z)] = "[slf| (x := 3) <= (y > z) ]"
