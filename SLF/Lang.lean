@@ -112,7 +112,7 @@ scoped syntax:70 slf_term:70 slf_term:71 : slf_term
 scoped syntax:31 "if " slf_term:1 " then " slf_term:1 " else " slf_term:1 : slf_term
 scoped syntax:31 "if " slf_term:1 " then " slf_term:1 " end" : slf_term
 -- seq
-scoped syntax:32 slf_term " ; " slf_term:1 : slf_term
+scoped syntax:32 slf_term "; " slf_term:1 : slf_term
 -- let
 scoped syntax:32 "let " ident " := " slf_term:1 " in " slf_term:1 : slf_term
 scoped syntax:32 "let " ident ident+ " := " slf_term:1 " in " slf_term:1 : slf_term
@@ -130,7 +130,7 @@ scoped syntax "unit" : slf_term
 scoped syntax "ref" : slf_term
 scoped syntax "free": slf_term
 scoped syntax "not": slf_term
-scoped syntax " ! " slf_term:33 : slf_term
+scoped syntax "!" slf_term:33 : slf_term
 scoped syntax ident " := " slf_term:33 : slf_term
 scoped syntax "[" term "]" " := " slf_term:33 : slf_term
 scoped syntax:42 slf_term:42 " + " slf_term:43 : slf_term
@@ -306,43 +306,118 @@ example: [term| let f x := x + 3 in f < y < z] =
 ## Pretty printing of the language
 -/
 
+section
+open Lean Elab Command Term PrettyPrinter Delaborator
 
 @[app_unexpander Val.int]
-def unexpandValInt: Lean.PrettyPrinter.Unexpander
+def unexpandValInt: Unexpander
   | `($_ $x:num ) => `([term| $x:num])
   | _ => throw ()
 
 
+@[app_unexpander Val.unit]
+def unexpandValUnit: Unexpander
+  | `($_) => `([term| unit ])
+
+
+@[app_unexpander Val.fun]
+def unexpandValFun: Unexpander
+  | `($_ $x:str [term| $b]) =>
+    let name := mkIdent (Lean.Name.mkStr1 x.getString)
+    match b with
+    | `(slf_term| fun $x* => $b) => `([term| vfun $name $x* => $b ])
+    | `(slf_term| $t ) => `([term| vfun $name => $t ])
+  | _ => throw ()
+
+
+@[app_unexpander Val.fix]
+def unexpandValFix: Unexpander
+  | `($_ $f:str $x:str [term| $b]) =>
+    let name_f := mkIdent (Lean.Name.mkStr1 f.getString)
+    let name_x := mkIdent (Lean.Name.mkStr1 x.getString)
+    match b with
+    | `(slf_term| fun $x* => $b) => `([term| vfix $name_f $name_x $x* => $b ])
+    | `(slf_term| $t ) => `([term| vfix $name_f $name_x => $t ])
+  | _ => throw ()
+
+
+@[app_unexpander Val.prim]
+def unexpandValPrim: Unexpander
+  | `($_ $p) =>
+    match p with
+    | `(Prim.ref) => `([term| ref ])
+    | `(Prim.free) => `([term| free ])
+    | `(Prim.neg) => `([term| not ])
+    | _ => throw ()
+  | _ => throw ()
+
+
 @[app_unexpander Term.var]
-def unexpandVar: Lean.PrettyPrinter.Unexpander
+def unexpandVar: Unexpander
   | `($_ $x:str) =>
-    let name := Lean.mkIdent (Lean.Name.mkStr1 x.getString)
+    let name := mkIdent (Lean.Name.mkStr1 x.getString)
     `([term| $name:ident ])
   | `($_ $x:term) => `([term| [$x] ])
   | _ => throw ()
 
 
 @[app_unexpander Term.val]
-def unexpandVal: Lean.PrettyPrinter.Unexpander
+def unexpandVal: Unexpander
   | `($_ [term| $n:num ]) => `([term| $n:num])
   | `($_ $x:num) => `([term| $x:num])
+  | `($_ [term| unit ]) => `([term| unit ])
+  | `($_ [term| vfun $x* => $t ]) => `([term| vfun $x* => $t ])
+  | `($_ [term| vfix $f $x* => $t ]) => `([term| vfix $f $x* => $t ])
   | `($_ $x:term) => `([term| [$x] ])
   | _ => throw ()
 
 
+def unexpandAppArg: TSyntax `slf_term → UnexpandM (TSyntax `slf_term)
+  | `(slf_term| $f $x ) => `(slf_term| ($f $x))
+  | t => `(slf_term| $t)
+
+
+def unexpandAppFun: TSyntax `slf_term → UnexpandM (TSyntax `slf_term)
+  | `(slf_term| $f $x ) => `(slf_term| $f $x)
+  | `(slf_term| [$t] ) => `(slf_term| [$t])
+  | `(slf_term| $i:ident ) => `(slf_term| $i:ident)
+  | f => `(slf_term| ($f))
+
+
 @[app_unexpander Term.app]
-def unexpandApp: Lean.PrettyPrinter.Unexpander
-  | `($_ [term| $a] [term| $b1 $b2 ]) => `([term| $a ($b1 $b2) ])
-  | `($_ [term| fun $x:ident* => $a] [term| $b ]) => `([term| (fun $x* => $a) $b ])
-  | `($_ [term| fix $f:ident $x:ident* => $a] [term| $b ]) => `([term| (fix $f $x* => $a) $b ])
-  | `($_ [term| $a ] [term| $b ]) => `([term| $a $b ])
+def unexpandApp: Unexpander
+  | `($_ [term| $f] [term| $a ]) => do
+    let a' ← unexpandAppArg a
+    let f' ← unexpandAppFun f
+    let t ← `(slf_term|$f' $a')
+    match t with
+    | `(slf_term| [Val.prim Prim.get] $a) => `([term| ! $a ])
+    | `(slf_term| [Val.prim Prim.set] $a:ident $b) => `([term| $a:ident := $b ])
+    | `(slf_term| [Val.prim Prim.set] [$t] $b) => `([term| [$t] := $b ])
+    | `(slf_term| [Val.prim Prim.add] $a $b) => `([term| $a + $b ])
+    | t => `([term| $t ])
+  | _ => throw ()
+
+
+@[app_unexpander Term.if]
+def unexpandIf: Unexpander
+  | `($_ [term| $cond] [term| $t] [term| $f]) =>
+    match f with
+    | `(slf_term| unit ) => `([term| if $cond then $t end ])
+    | `(slf_term| $f) => `([term| if $cond then $t else $f ])
+  | _ => throw ()
+
+
+@[app_unexpander Term.seq]
+def unexpandSeq: Unexpander
+  | `($_ [term| $a] [term| $b ]) => `([term| $a; $b ])
   | _ => throw ()
 
 
 @[app_unexpander Term.fun]
-def unexpandFun: Lean.PrettyPrinter.Unexpander
+def unexpandFun: Unexpander
   | `($_ $x:str $a) =>
-    let name := Lean.mkIdent (Lean.Name.mkStr1 x.getString)
+    let name := mkIdent (Lean.Name.mkStr1 x.getString)
     match a with
     | `([term| fun $x* => $a ]) => `([term| fun $name $x* => $a ])
     | `([term| $t ]) => `([term| fun $name => $t ])
@@ -351,10 +426,10 @@ def unexpandFun: Lean.PrettyPrinter.Unexpander
 
 
 @[app_unexpander Term.fix]
-def unexpandFix: Lean.PrettyPrinter.Unexpander
+def unexpandFix: Unexpander
   | `($_ $f:str $x:str $a) =>
-    let name_f := Lean.mkIdent (Lean.Name.mkStr1 f.getString)
-    let name_x := Lean.mkIdent (Lean.Name.mkStr1 x.getString)
+    let name_f := mkIdent (Lean.Name.mkStr1 f.getString)
+    let name_x := mkIdent (Lean.Name.mkStr1 x.getString)
     match a with
     | `([term| fun $x* => $a ]) => `([term| fix $name_f $name_x $x* => $a ])
     | `([term| $t ]) => `([term| fix $name_f $name_x => $t ])
@@ -362,37 +437,103 @@ def unexpandFix: Lean.PrettyPrinter.Unexpander
   | _ => throw ()
 
 
-namespace TestPrettyPrinter
-open Lean Elab Command Term PrettyPrinter Delaborator
+@[app_unexpander Term.let]
+def unexpandLet: Unexpander
+  | `($_ $x:str [term| $v ] [term| $b ]) =>
+    let name := mkIdent (Lean.Name.mkStr1 x.getString)
+    match v with
+    | `(slf_term| fun $x* => $v ) => `([term| let $name $x* := $v in $b ])
+    | `(slf_term| fix $_ $x* => $v ) => `([term| let rec $name $x* := $v in $b ])
+    | `(slf_term| $v ) => `([term| let $name := $v in $b ])
+  | _ => throw ()
 
-/--
-Evaluate the pretty printer on a term. Since I am going to compare the result using `=`,
-the precedence of `pp` should be higher than that of `=`.
--/
-scoped elab "pp" stx:term:51: term => do
+scoped elab "slf_pp" stx:term:51: term => do
   let expr ← elabTerm stx none
   let pretty ← ppExpr expr
   let str := toString pretty
   pure <| toExpr str
 
+end
+
+namespace TestPrettyPrinter
+
+/--
+Evaluate the pretty printer on a term. Since I am going to compare the result using `=`,
+the precedence of `pp` should be higher than that of `=`.
+-/
+
 def num: Val := 3
 def x: String := "x"
 
-#guard pp [term| 3] = "[term| 3 ]"
-#guard pp [term| 3] = "[term| 3 ]"
-#guard pp [term| [3]] = "3"
-#guard pp Term.val num = "[term| [num] ]"
-#guard pp Term.var x = "[term| [x] ]"
-#guard pp [term| x] = "[term| x ]"
-#guard pp [term| ["x"]] = "[term| x ]"
-#guard pp [term| [x ++ "y"] y z] = "[term| [x ++ \"y\"] y z ]"
-#guard pp [term| (x y) z] = "[term| x y z ]"
-#guard pp [term| x (y z)] = "[term| x (y z) ]"
-#guard pp [term| (fun x => x y) z] = "[term| (fun x => x y) z ]"
-#guard pp [term| fun x => (x y z)] = "[term| fun x => x y z ]"
-#guard pp [term| fun x => fun y => fun z => z] = "[term| fun x y z => z ]"
-#guard pp [term| (fun x y => fun z => z) w] = "[term| (fun x y z => z) w ]"
-#guard pp [term| (fix f x => x y) z] = "[term| (fix f x => x y) z ]"
-#guard pp [term| (fix f x y => x y) z] = "[term| (fix f x y => x y) z ]"
-#guard pp [term| (fix f x y z => x y) z] = "[term| (fix f x y z => x y) z ]"
-#guard pp [term| (fix f x => fun y => fun z => x y) z] = "[term| (fix f x y z => x y) z ]"
+-- values
+#guard slf_pp Val.int 3 = "[term| 3 ]"
+#guard slf_pp [term| 3] = "[term| 3 ]"
+#guard slf_pp [term| [3]] = "3"  -- ofNat is just a `3`
+#guard slf_pp ([term| 3] : Term) = "[term| 3 ]"
+#guard slf_pp Term.val num = "[term| [num] ]"
+#guard slf_pp Val.unit = "[term| unit ]"
+#guard slf_pp Term.val Val.unit = "[term| unit ]"
+#guard slf_pp [term| unit] = "[term| unit ]"
+#guard slf_pp ([term| unit]: Term) = "[term| unit ]"
+#guard slf_pp Val.fun "x" [term| x] = "[term| vfun x => x ]"
+#guard slf_pp [term| vfun a => b] = "[term| vfun a => b ]"
+#guard slf_pp ([term| vfun a => b]: Term) = "[term| vfun a => b ]"
+#guard slf_pp [term| vfun x => fun y => fun z => z] = "[term| vfun x y z => z ]"
+#guard slf_pp Val.fix "f" "x" [term| x] = "[term| vfix f x => x ]"
+#guard slf_pp [term| vfix f a => b] = "[term| vfix f a => b ]"
+#guard slf_pp ([term| vfix f a => b]: Term) = "[term| vfix f a => b ]"
+#guard slf_pp [term| vfix f a => fun b => c] = "[term| vfix f a b => c ]"
+
+-- terms
+#guard slf_pp Term.var x = "[term| [x] ]"
+#guard slf_pp [term| x] = "[term| x ]"
+#guard slf_pp [term| ["x"]] = "[term| x ]"
+#guard slf_pp [term| [x ++ "y"] y z] = "[term| [x ++ \"y\"] y z ]"
+#guard slf_pp [term| (x y) z] = "[term| x y z ]"
+#guard slf_pp [term| x (y z)] = "[term| x (y z) ]"
+#guard slf_pp [term| x (y (z w))] = "[term| x (y (z w) ) ]"
+#guard slf_pp [term| x (y z) w] = "[term| x (y z) w ]"
+#guard slf_pp [term| x y z w] = "[term| x y z w ]"
+#guard slf_pp [term| [x] y z w] = "[term| [x] y z w ]"
+#guard slf_pp [term| [x] y [x] w] = "[term| [x] y [x] w ]"
+#guard slf_pp [term| [x] (y [x]) w] = "[term| [x] (y [x] ) w ]"
+#guard slf_pp [term| if x then y else z] = "[term| if x then y else z ]"
+#guard slf_pp [term| if x then y end] = "[term| if x then y end ]"
+#guard slf_pp [term| if [x] then y; z else w] = "[term| if [x] then y; z else w ]"
+#guard slf_pp [term| (fun x => x y) z] = "[term| (fun x => x y) z ]"
+#guard slf_pp [term| fun x => (x y z)] = "[term| fun x => x y z ]"
+#guard slf_pp [term| fun x => fun y => fun z => z] = "[term| fun x y z => z ]"
+#guard slf_pp [term| (fun x y => fun z => z) w] = "[term| (fun x y z => z) w ]"
+#guard slf_pp [term| if [x] then y; z else w] = "[term| if [x] then y; z else w ]"
+#guard slf_pp [term| (if [x] then y; z else w) c] = "[term| (if [x] then y; z else w) c ]"
+#guard slf_pp [term| (fix f x => x y) z] = "[term| (fix f x => x y) z ]"
+#guard slf_pp [term| (fix f x y => x y) z] = "[term| (fix f x y => x y) z ]"
+#guard slf_pp [term| (fix f x y z => x y) z] = "[term| (fix f x y z => x y) z ]"
+#guard slf_pp [term| (fix f x => fun y => fun z => x y) z] = "[term| (fix f x y z => x y) z ]"
+#guard slf_pp [term| (fix f x => fun y => fun z => x y) z] = "[term| (fix f x y z => x y) z ]"
+#guard slf_pp [term| (fix f x => fun y => if x then y; fun z => x y else z) z] = "[term| (fix f x y => if x then y; fun z => x y else z) z ]"
+-- let rules
+#guard slf_pp [term| let x := y in z] = "[term| let x := y in z ]"
+#guard slf_pp [term| let x y := z in w] = "[term| let x y := z in w ]"
+#guard slf_pp [term| let rec f x := y in z] = "[term| let rec f x := y in z ]"
+#guard slf_pp [term| let rec f x y := z in w] = "[term| let rec f x y := z in w ]"
+#guard slf_pp [term| let rec f x y := z in [x] w] = "[term| let rec f x y := z in [x] w ]"
+-- primitives
+-- `ref`, `free`, `not` are printed as is
+def prim := Val.prim Prim.get
+#guard slf_pp prim = "prim"
+#guard slf_pp [term| [prim]] = "[term| [prim] ]"
+#guard slf_pp [term| ref] = "[term| ref ]"
+#guard slf_pp [term| free] = "[term| free ]"
+#guard slf_pp [term| not] = "[term| not ]"
+-- the rest must be application of the primitive to its arguments
+-- get
+#guard slf_pp (Term.app (Val.prim Prim.get) x) = "[term| ! [x] ]"
+#guard slf_pp [term| !x] = "[term| !x ]"
+#guard slf_pp [term| !!x] = "[term| !!x ]"
+#guard slf_pp [term| ! x (x y)] = "[term| ! (x (x y) ) ]"
+#guard slf_pp [term| ! x x y] = "[term| ! (x x y) ]"
+-- assign
+#guard slf_pp (Term.app (Term.app (Val.prim Prim.set) x) "y") = "[term| [x] := y ]"
+-- arithmetic
+#guard slf_pp (Term.app (Term.app (Val.prim Prim.add) x) "y") = "[term| [x] + y ]"
