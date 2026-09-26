@@ -130,6 +130,7 @@ scoped syntax "unit" : slf_term
 scoped syntax "ref" : slf_term
 scoped syntax "free": slf_term
 scoped syntax "not": slf_term
+scoped syntax "rand": slf_term
 scoped syntax "!" slf_term:33 : slf_term
 scoped syntax ident " := " slf_term:33 : slf_term
 scoped syntax "[" term "]" " := " slf_term:33 : slf_term
@@ -172,6 +173,7 @@ scoped macro_rules
 | `([slf| ref ]) => `(Val.prim Prim.ref)
 | `([slf| free ]) => `(Val.prim Prim.free)
 | `([slf| not ]) => `(Val.prim Prim.neg)
+| `([slf| rand ]) => `(Val.prim Prim.rand)
 | `([slf| ! $t ]) => `(Term.app (Prim.get) [slf| $t ])
 | `([slf| $t1:ident := $t2 ]) => `(Term.app (Term.app Prim.set [slf| $t1:ident ]) [slf| $t2 ])
 | `([slf| [$t1] := $t2 ]) => `(Term.app (Term.app Prim.set [slf| [$t1] ]) [slf| $t2 ])
@@ -261,6 +263,16 @@ example: [slf| let rec f x y := y in z] =
 := rfl
 example: [slf| let rec f x y := y in [let x := "x"; x ++ "y"] := z] =
   Term.let "f" (.fix "f" "x" (.fun "y" "y")) (.app (.app Prim.set "xy") "z")
+:= rfl
+example: [slf| rand ] = Term.val (Val.prim Prim.rand) := rfl
+example: [slf| rand (3 + x)] =
+  Term.app Prim.rand (.app (.app Prim.add 3) "x")
+:= rfl
+example: [slf| (rand 3) + x] =
+  Term.app (.app Prim.add (.app Prim.rand 3)) "x"
+:= rfl
+example: [slf| rand x + 3] =
+  Term.app (.app Prim.add (.app Prim.rand "x")) 3
 := rfl
 example: [slf| x + y + z] =
   Term.app (.app Prim.add (.app (.app Prim.add "x") "y")) "z"
@@ -359,6 +371,7 @@ def unexpandValPrim: Unexpander
     | `(Prim.ref) => `([slf| ref ])
     | `(Prim.free) => `([slf| free ])
     | `(Prim.neg) => `([slf| not ])
+    | `(Prim.rand) => `([slf| rand ])
     | _ => throw ()
   | _ => throw ()
 
@@ -376,23 +389,30 @@ def unexpandVar: Unexpander
 def unexpandVal: Unexpander
   | `($_ [slf| $n:num ]) => `([slf| $n:num])
   | `($_ $x:num) => `([slf| $x:num])
-  | `($_ [slf| unit ]) => `([slf| unit ])
-  | `($_ [slf| vfun $x* => $t ]) => `([slf| vfun $x* => $t ])
-  | `($_ [slf| vfix $f $x* => $t ]) => `([slf| vfix $f $x* => $t ])
+  | `($_ [slf| $x ]) => `([slf| $x ])
   | `($_ $x:term) => `([slf| [$x] ])
   | _ => throw ()
 
 
-def unexpandAppArg: TSyntax `slf_term → UnexpandM (TSyntax `slf_term)
-  | `(slf_term| $f $x ) => `(slf_term| ($f $x))
-  | t => `(slf_term| $t)
 
+def addParen: TSyntax `slf_term → UnexpandM (TSyntax `slf_term)
+  | `(slf_term| ($t) ) => `(slf_term| ($t))
+  | t => `(slf_term| ($t))
+
+def unexpandAppArg: TSyntax `slf_term → UnexpandM (TSyntax `slf_term)
+  | `(slf_term| $f $x ) => `(slf_term| $f $x ) >>= addParen
+  | t => `(slf_term| $t)
 
 def unexpandAppFun: TSyntax `slf_term → UnexpandM (TSyntax `slf_term)
   | `(slf_term| $f $x ) => `(slf_term| $f $x)
   | `(slf_term| [$t] ) => `(slf_term| [$t])
   | `(slf_term| $i:ident ) => `(slf_term| $i:ident)
-  | f => `(slf_term| ($f))
+  | `(slf_term| ref ) => `(slf_term| ref)
+  | `(slf_term| free ) => `(slf_term| free)
+  | `(slf_term| not ) => `(slf_term| not)
+  | `(slf_term| rand ) => `(slf_term| rand)
+  | `(slf_term| ( $f ) ) => `(slf_term| ( $f ))
+  | `(slf_term| $f ) => addParen f
 
 
 def higherThanMul: TSyntax `slf_term → Bool
@@ -408,7 +428,7 @@ def wrapMulLeft: TSyntax `slf_term → UnexpandM (TSyntax `slf_term)
   | `(slf_term| $a * $b ) => `(slf_term| $a * $b)
   | `(slf_term| $a / $b ) => `(slf_term| $a / $b)
   | `(slf_term| $a % $b ) => `(slf_term| $a % $b)
-  | t => `(slf_term| ($t))
+  | t => addParen t
 
 
 def higherThanAdd: TSyntax `slf_term → Bool
@@ -422,7 +442,7 @@ def higherThanAdd: TSyntax `slf_term → Bool
 def wrapAddLeft: TSyntax `slf_term → UnexpandM (TSyntax `slf_term)
   | `(slf_term| $a + $b ) => `(slf_term| $a + $b)
   | `(slf_term| $a - $b ) => `(slf_term| $a - $b)
-  | t => `(slf_term| ($t))
+  | t => addParen t
 
 
 def higherThanEq: TSyntax `slf_term → Bool
@@ -444,54 +464,64 @@ def unexpandApp: Unexpander
     let f' ← unexpandAppFun f
     let t ← `(slf_term|$f' $a')
     match t with
+    -- unary operators
     | `(slf_term| [Val.prim Prim.get] $a) => `([slf| ! $a ])
-    | `(slf_term| [Val.prim Prim.set] $a:ident $b) => `([slf| $a:ident := $b ])
-    | `(slf_term| [Val.prim Prim.set] [$t] $b) => `([slf| [$t] := $b ])
     | `(slf_term| [Val.prim Prim.opp] $a) =>
       if higherThanMul a then `([slf| - $a ]) else `([slf| - ($a) ])
+    | `(slf_term| ref $a) =>
+      if higherThanMul a then `([slf| ref $a ]) else `([slf| ref ($a) ])
+    | `(slf_term| free $a) =>
+      if higherThanMul a then `([slf| free $a ]) else `([slf| free ($a) ])
+    | `(slf_term| not $a) =>
+      if higherThanMul a then `([slf| not $a ]) else `([slf| not ($a) ])
+    | `(slf_term| rand $a) =>
+      if higherThanMul a then `([slf| rand $a ]) else `([slf| rand ($a) ])
+    -- binary operators
+    | `(slf_term| [Val.prim Prim.set] $a:ident $b) => `([slf| $a:ident := $b ])
+    | `(slf_term| [Val.prim Prim.set] [$t] $b) => `([slf| [$t] := $b ])
     | `(slf_term| [Val.prim Prim.add] $a $b) =>
       let a' ← if higherThanAdd a then `(slf_term| $a) else wrapAddLeft a
-      let b' ← if higherThanAdd b then `(slf_term| $b) else `(slf_term| ($b))
+      let b' ← if higherThanAdd b then `(slf_term| $b) else addParen b
       `([slf| $a' + $b' ])
     | `(slf_term| [Val.prim Prim.sub] $a $b) =>
       let a' ← if higherThanAdd a then `(slf_term| $a) else wrapAddLeft a
-      let b' ← if higherThanAdd b then `(slf_term| $b) else `(slf_term| ($b))
+      let b' ← if higherThanAdd b then `(slf_term| $b) else addParen b
       `([slf| $a' - $b' ])
     | `(slf_term| [Val.prim Prim.mul] $a $b) =>
       let a' ← if higherThanMul a then `(slf_term| $a) else wrapMulLeft a
-      let b' ← if higherThanMul b then `(slf_term| $b) else `(slf_term| ($b))
+      let b' ← if higherThanMul b then `(slf_term| $b) else addParen b
       `([slf| $a' * $b' ])
     | `(slf_term| [Val.prim Prim.div] $a $b) =>
       let a' ← if higherThanMul a then `(slf_term| $a) else wrapMulLeft a
-      let b' ← if higherThanMul b then `(slf_term| $b) else `(slf_term| ($b))
+      let b' ← if higherThanMul b then `(slf_term| $b) else addParen b
       `([slf| $a' / $b' ])
     | `(slf_term| [Val.prim Prim.mod] $a $b) =>
       let a' ← if higherThanMul a then `(slf_term| $a) else wrapMulLeft a
-      let b' ← if higherThanMul b then `(slf_term| $b) else `(slf_term| ($b))
+      let b' ← if higherThanMul b then `(slf_term| $b) else addParen b
       `([slf| $a' % $b' ])
     | `(slf_term| [Val.prim Prim.eq] $a $b) =>
-      let a' ← if higherThanEq a then `(slf_term| $a) else `(slf_term| ($a))
-      let b' ← if higherThanEq b then `(slf_term| $b) else `(slf_term| ($b))
+      let a' ← if higherThanEq a then `(slf_term| $a) else addParen a
+      let b' ← if higherThanEq b then `(slf_term| $b) else addParen b
       `([slf| $a' == $b' ])
     | `(slf_term| [Val.prim Prim.neq] $a $b) =>
-      let a' ← if higherThanEq a then `(slf_term| $a) else `(slf_term| ($a))
-      let b' ← if higherThanEq b then `(slf_term| $b) else `(slf_term| ($b))
+      let a' ← if higherThanEq a then `(slf_term| $a) else addParen a
+      let b' ← if higherThanEq b then `(slf_term| $b) else addParen b
       `([slf| $a' != $b' ])
     | `(slf_term| [Val.prim Prim.le] $a $b) =>
-      let a' ← if higherThanLe a then `(slf_term| $a) else `(slf_term| ($a))
-      let b' ← if higherThanLe b then `(slf_term| $b) else `(slf_term| ($b))
+      let a' ← if higherThanLe a then `(slf_term| $a) else addParen a
+      let b' ← if higherThanLe b then `(slf_term| $b) else addParen b
       `([slf| $a' <= $b' ])
     | `(slf_term| [Val.prim Prim.lt] $a $b) =>
-      let a' ← if higherThanLe a then `(slf_term| $a) else `(slf_term| ($a))
-      let b' ← if higherThanLe b then `(slf_term| $b) else `(slf_term| ($b))
+      let a' ← if higherThanLe a then `(slf_term| $a) else addParen a
+      let b' ← if higherThanLe b then `(slf_term| $b) else addParen b
       `([slf| $a' < $b' ])
     | `(slf_term| [Val.prim Prim.ge] $a $b) =>
-      let a' ← if higherThanLe a then `(slf_term| $a) else `(slf_term| ($a))
-      let b' ← if higherThanLe b then `(slf_term| $b) else `(slf_term| ($b))
+      let a' ← if higherThanLe a then `(slf_term| $a) else addParen a
+      let b' ← if higherThanLe b then `(slf_term| $b) else addParen b
       `([slf| $a' >= $b' ])
     | `(slf_term| [Val.prim Prim.gt] $a $b) =>
-      let a' ← if higherThanLe a then `(slf_term| $a) else `(slf_term| ($a))
-      let b' ← if higherThanLe b then `(slf_term| $b) else `(slf_term| ($b))
+      let a' ← if higherThanLe a then `(slf_term| $a) else addParen a
+      let b' ← if higherThanLe b then `(slf_term| $b) else addParen b
       `([slf| $a' > $b' ])
     | t => `([slf| $t ])
   | _ => throw ()
@@ -622,7 +652,12 @@ def prim := Val.prim Prim.get
 #guard slf_pp prim = "prim"
 #guard slf_pp [slf| [prim]] = "[slf| [prim] ]"
 #guard slf_pp [slf| ref] = "[slf| ref ]"
+#guard slf_pp [slf| ref x] = "[slf| ref x ]"
 #guard slf_pp [slf| free] = "[slf| free ]"
+#guard slf_pp [slf| free x] = "[slf| free x ]"
+#guard slf_pp [slf| free (x + 1)] = "[slf| free (x + 1) ]"
+#guard slf_pp [slf| (free x) + 1] = "[slf| (free x) + 1 ]"
+#guard slf_pp [slf| free x + 1] = "[slf| (free x) + 1 ]"
 #guard slf_pp [slf| not] = "[slf| not ]"
 -- the rest must be application of the primitive to its arguments
 -- get
