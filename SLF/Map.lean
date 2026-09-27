@@ -18,13 +18,9 @@ class Mappoid (M: Type -> Type -> Type) where
   find {α β}: M α β → α → Option β
   empty {α β}: M α β
   union {α β}: M α β → M α β → M α β
+  update {α β} [DecidableEq α]: M α β → α → β → M α β
   remove {α β} [DecidableEq α]: M α β → α → M α β
   filter {α β}: (α → β → Bool) → M α β → M α β
-
-
-scoped notation:55 m1:55 " ∪ " m2:56 => Mappoid.union m1 m2
-scoped notation:55 m1:55 " ÷ " m2:56 => Mappoid.remove m1 m2
-
 
 instance {α β M} [inst: Mappoid M]: EmptyCollection (M α β) where
   emptyCollection := inst.empty
@@ -35,6 +31,18 @@ instance {α β} {M} [inst: Mappoid M]: Membership α (M α β) where
 instance {α β M} [inst: Mappoid M]: CoeFun (M α β) (fun _ => α → Option β) where
   coe m := inst.find m
 
+instance {α β M} [inst: Mappoid M]: GetElem? (M α β) α β (fun m k => k ∈ m) where
+  getElem m k h := by
+    cases E: m k with
+    | some v => exact v
+    | none => contradiction
+
+  getElem? := inst.find
+
+
+scoped notation:55 m1:55 " ∪ " m2:56 => Mappoid.union m1 m2
+scoped notation:55 m1:55 " ÷ " m2:56 => Mappoid.remove m1 m2
+scoped notation m "[" k " => " v "]" => Mappoid.update m k v
 
 /-!
 This makes sure that the `Membership` relation is decidable. We may have more
@@ -153,6 +161,7 @@ instance: Mappoid Map where
     match m1 k with
     | some v => some v
     | none => m2 k
+  update := fun m k v k' => if k = k' then some v else m k'
   remove := fun m k k' => if k = k' then none else m k'
   filter := fun p m k =>
     match m k with
@@ -229,6 +238,17 @@ theorem Map.union_finite {α β: Type} (m1 m2: Map α β) :
   grind
 
 
+theorem Map.update_finite {α β: Type} [DecidableEq α] (m: Map α β) (k: α) (v: β) :
+  m.finite → (Mappoid.update m k v).finite
+:= by
+  intro ⟨l, H⟩
+  unfold Map.finite
+  exists (k :: l)
+  intro k'
+  simp [Mappoid.update]
+  grind
+
+
 theorem Map.remove_finite {α β: Type} [DecidableEq α] (m: Map α β) (k: α) :
   Map.finite m → Map.finite (m ÷ k)
 := by
@@ -262,6 +282,8 @@ instance: Mappoid FMap where
   empty := ⟨∅, Map.empty_finite⟩
   union := fun m1 m2 =>
     ⟨m1.val ∪ m2.val, Map.union_finite m1.val m2.val m1.property m2.property⟩
+  update := fun m k v =>
+    ⟨Mappoid.update m.val k v, Map.update_finite m.val k v m.property⟩
   remove := fun m k =>
     ⟨m.val ÷ k, Map.remove_finite m.val k m.property⟩
   filter := fun p m =>
