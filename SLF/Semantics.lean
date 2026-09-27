@@ -1,9 +1,8 @@
 import SLF.Lang
+import SLF.Heap
 
 namespace SLF.Lang
-open Map
-
-abbrev Heap := FMap Loc Val
+open Map Heap
 
 
 def Term.isValue : Term → Bool
