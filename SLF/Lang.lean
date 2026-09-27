@@ -81,11 +81,11 @@ instance: Coe Int Val where
 
 
 instance: Coe Int Term where
-  coe := Term.val ∘ Val.int
+  coe i := Term.val (Val.int i)
 
 
 instance: Coe Nat Val where
-  coe := Val.int ∘ Int.ofNat
+  coe i := Val.int (Int.ofNat i)
 
 instance {n}: OfNat Val n where
   ofNat := Val.int n
@@ -93,6 +93,14 @@ instance {n}: OfNat Val n where
 
 instance {n}: OfNat Term n where
   ofNat := Term.val (Val.int n)
+
+
+instance: Coe Bool Val where
+  coe := Val.bool
+
+
+instance: Coe Bool Term where
+  coe i := Term.val (Val.bool i)
 
 /-!
 ## Custom syntax for the language
@@ -106,6 +114,9 @@ scoped syntax " (" slf_term ") " : slf_term
 scoped syntax ident : slf_term
 -- number
 scoped syntax num : slf_term
+-- boolean
+scoped syntax "true" : slf_term
+scoped syntax "false" : slf_term
 -- application
 scoped syntax:70 slf_term:70 slf_term:71 : slf_term
 -- ite
@@ -169,6 +180,8 @@ scoped macro_rules
 | `([slf| vfix $f $x => $t ]) => `(Val.fix $(Lean.quote f.getId.toString) $(Lean.quote x.getId.toString) [slf| $t ])
 | `([slf| vfix $f $x1 $x2* => $t ]) => `(Val.fix $(Lean.quote f.getId.toString) $(Lean.quote x1.getId.toString) [slf| fun $x2* => $t ])
 | `([slf| unit ]) => `(Val.unit)
+| `([slf| true ]) => `(Val.bool true)
+| `([slf| false ]) => `(Val.bool false)
 -- primitives
 | `([slf| ref ]) => `(Val.prim Prim.ref)
 | `([slf| free ]) => `(Val.prim Prim.free)
@@ -334,7 +347,21 @@ open Lean Elab Command Term PrettyPrinter Delaborator
 
 @[app_unexpander Val.int]
 def unexpandValInt: Unexpander
-  | `($_ $x:num ) => `([slf| $x:num])
+  | `($_ $x:num) => `([slf| $x:num])
+  | `($_ $x:ident) => `([slf| [$x:ident]])
+  | `($_ $x:term) => `([slf| [$x:term]])
+  | _ => throw ()
+
+
+
+@[app_unexpander Val.bool]
+def unexpandValBool: Unexpander
+  | `($_ $x:ident) =>
+    match x with
+    | `(true) => `([slf| true ])
+    | `(false) => `([slf| false ])
+    | _ => `([slf| [$x:ident]])
+  | `($_ $x:term) => `([slf| [$x:term]])
   | _ => throw ()
 
 
@@ -392,7 +419,6 @@ def unexpandVal: Unexpander
   | `($_ [slf| $x ]) => `([slf| $x ])
   | `($_ $x:term) => `([slf| [$x] ])
   | _ => throw ()
-
 
 
 def addParen: TSyntax `slf_term → UnexpandM (TSyntax `slf_term)
@@ -590,19 +616,32 @@ Evaluate the pretty printer on a term. Since I am going to compare the result us
 the precedence of `pp` should be higher than that of `=`.
 -/
 
+def i: Int := 3
+def b: Bool := true
 def num: Val := 3
 def x: String := "x"
 
 -- values
+-- integer values
 #guard slf_pp Val.int 3 = "[slf| 3 ]"
+#guard slf_pp [slf| [Val.int 3]] = "[slf| 3 ]"
+#guard slf_pp [slf| [Val.int i] ] = "[slf| [i] ]"
 #guard slf_pp [slf| 3] = "[slf| 3 ]"
 #guard slf_pp [slf| [3]] = "3"  -- ofNat is just a `3`
 #guard slf_pp ([slf| 3] : Term) = "[slf| 3 ]"
 #guard slf_pp Term.val num = "[slf| [num] ]"
+-- boolean values
+#guard slf_pp Val.bool true = "[slf| true ]"
+#guard slf_pp [slf| true] = "[slf| true ]"
+#guard slf_pp ([slf| true]: Term) = "[slf| true ]"
+#guard slf_pp Val.bool b = "[slf| [b] ]"
+#guard slf_pp [slf| [b == b]] = "[slf| [b == b] ]"
+-- unit value
 #guard slf_pp Val.unit = "[slf| unit ]"
 #guard slf_pp Term.val Val.unit = "[slf| unit ]"
 #guard slf_pp [slf| unit] = "[slf| unit ]"
 #guard slf_pp ([slf| unit]: Term) = "[slf| unit ]"
+-- function values
 #guard slf_pp Val.fun "x" [slf| x] = "[slf| vfun x => x ]"
 #guard slf_pp [slf| vfun a => b] = "[slf| vfun a => b ]"
 #guard slf_pp ([slf| vfun a => b]: Term) = "[slf| vfun a => b ]"
@@ -670,6 +709,11 @@ def prim := Val.prim Prim.get
 #guard slf_pp (Term.app (Term.app (Val.prim Prim.set) x) "y") = "[slf| [x] := y ]"
 -- arithmetic
 #guard slf_pp (Term.app (Term.app (Val.prim Prim.add) x) "y") = "[slf| [x] + y ]"
+#guard slf_pp [slf| [num] + y ] = "[slf| [num] + y ]"
+#guard slf_pp [slf| [num] + [num] ] = "[slf| [num] + [num] ]"
+#guard slf_pp [slf| [num] + [i] ] = "[slf| [num] + [i] ]"
+#guard slf_pp (Term.val (.int (i + i))) = "[slf| [i + i] ]"
+#guard slf_pp [slf| [i + i] ] = "[slf| [i + i] ]"
 #guard slf_pp [slf| (x := y) + y] = "[slf| (x := y) + y ]"
 #guard slf_pp [slf| (x + y) + z] = "[slf| x + y + z ]"
 #guard slf_pp [slf| x + (y + z)] = "[slf| x + (y + z) ]"
