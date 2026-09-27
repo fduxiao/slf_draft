@@ -28,12 +28,28 @@ inductive Prim: Type where
   | ge : Prim
   | gt : Prim
   | ptr_add : Prim
-  deriving Inhabited, Repr
+  deriving Inhabited, Repr, BEq, DecidableEq
 
 
-def Loc: Type := Nat deriving OfNat, Inhabited, Repr
+def Loc: Type := Nat deriving OfNat, Inhabited, Repr, BEq, DecidableEq, HAdd
+
+@[simp]
+def Loc.toNat (l: Loc): Nat := l
+@[simp]
+def Loc.toInt (l: Loc): Int := Int.ofNat l
+
+
+instance: Coe Nat Loc where
+  coe x := x
+
+instance {n}: OfNat Loc n where
+  ofNat := n
+
+instance: HAdd Loc Int Loc where
+  hAdd x y := (x.toInt + y).toNat
+
 def null: Loc := 0
-def Var: Type := String deriving Inhabited, Repr
+abbrev Var: Type := String
 
 mutual
 
@@ -47,7 +63,7 @@ inductive Val : Type where
   | fix : Var → Var → Term → Val
   | uninit : Val
   | error : Val
-  deriving Inhabited, Repr
+  deriving Inhabited, Repr, BEq, DecidableEq
 
 
 inductive Term : Type where
@@ -67,40 +83,33 @@ end
 instance: Coe Prim Val where
   coe := Val.prim
 
-
-instance: Coe Val Term where
-  coe := Term.val
-
-
-instance: Coe String Term where
-  coe := Term.var
-
+instance: Coe Loc Val where
+  coe := Val.loc
 
 instance: Coe Int Val where
   coe := Val.int
 
-
-instance: Coe Int Term where
-  coe i := Term.val (Val.int i)
-
-
 instance: Coe Nat Val where
   coe i := Val.int (Int.ofNat i)
 
+instance: Coe Bool Val where
+  coe := Val.bool
+
 instance {n}: OfNat Val n where
   ofNat := Val.int n
+
+instance: Coe Val Term where
+  coe := Term.val
+
+instance: Coe String Term where
+  coe := Term.var
 
 
 instance {n}: OfNat Term n where
   ofNat := Term.val (Val.int n)
 
 
-instance: Coe Bool Val where
-  coe := Val.bool
-
-
-instance: Coe Bool Term where
-  coe i := Term.val (Val.bool i)
+def Term.loc (l: Loc): Term := Term.val (Val.loc l)
 
 /-!
 ## Custom syntax for the language
@@ -325,6 +334,10 @@ example: [slf| x + - t * z - y % z] =
     (.app (.app Prim.mod "y") "z")
 := rfl
 -- ptr_add
+example (ptr: Loc): (ptr: Term) = Term.val (Val.loc ptr) := rfl
+example (ptr: Loc): [slf| [ptr] +> 3] =
+  Term.app (.app Prim.ptr_add (Term.val (Val.loc ptr))) 3
+:= rfl
 example: [slf| x +> y +> z] =
   Term.app (.app Prim.ptr_add (.app (.app Prim.ptr_add "x") "y")) "z"
 := rfl
@@ -373,6 +386,14 @@ open Lean Elab Command Term PrettyPrinter Delaborator
 
 @[app_unexpander Val.int]
 def unexpandValInt: Unexpander
+  | `($_ $x:num) => `([slf| $x:num])
+  | `($_ $x:ident) => `([slf| [$x:ident]])
+  | `($_ $x:term) => `([slf| [$x:term]])
+  | _ => throw ()
+
+
+@[app_unexpander Val.loc]
+def unexpandValLoc: Unexpander
   | `($_ $x:num) => `([slf| $x:num])
   | `($_ $x:ident) => `([slf| [$x:ident]])
   | `($_ $x:term) => `([slf| [$x:term]])
@@ -660,6 +681,7 @@ def i: Int := 3
 def b: Bool := true
 def num: Val := 3
 def x: String := "x"
+def l: Loc := 3
 
 -- values
 -- integer values
@@ -752,6 +774,7 @@ def prim := Val.prim Prim.get
 #guard slf_pp [slf| [num] + y ] = "[slf| [num] + y ]"
 #guard slf_pp [slf| [num] + [num] ] = "[slf| [num] + [num] ]"
 #guard slf_pp [slf| [num] + [i] ] = "[slf| [num] + [i] ]"
+-- #guard slf_pp [slf| [3] + [i] ] = "[slf| 3 + [i] ]"
 #guard slf_pp (Term.val (.int (i + i))) = "[slf| [i + i] ]"
 #guard slf_pp [slf| [i + i] ] = "[slf| [i + i] ]"
 #guard slf_pp [slf| (x := y) + y] = "[slf| (x := y) + y ]"
@@ -772,6 +795,9 @@ def prim := Val.prim Prim.get
 #guard slf_pp [slf| x +> y * z] = "[slf| x +> y * z ]"
 #guard slf_pp [slf| x +> y + z] = "[slf| x +> y + z ]"
 #guard slf_pp [slf| x +> y + z +> 5 * w % 3] = "[slf| x +> y + z +> 5 * w % 3 ]"
+#guard slf_pp [slf| [l] +> y] = "[slf| [l] +> y ]"
+#guard slf_pp [slf| [l] +> 3] = "[slf| [l] +> 3 ]"
+#guard slf_pp [slf| 3 +> y] = "[slf| 3 +> y ]"
 -- comparison
 #guard slf_pp [slf| -x + y == z] = "[slf| -x + y == z ]"
 #guard slf_pp [slf| -x + (y != z)] = "[slf| -x + (y != z) ]"
