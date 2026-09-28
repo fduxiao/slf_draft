@@ -69,7 +69,7 @@ theorem QImp.refl {α} {Q: α → HProp}:
 
 
 def HProp.empty : HProp := fun h => h = ∅
-def HProp.single (p: Loc) (v: Val): HProp := fun h => h = ∅ [p => v]
+def HProp.single (p: Loc) (v: Val): HProp := fun h => h = Mappoid.single p v
 def HProp.star (H1 H2: HProp): HProp :=
   fun h =>
     ∃ h1 h2, H1 h1 ∧ H2 h2 ∧ h1 ⊥ h2 ∧ h = h1 ∪ h2

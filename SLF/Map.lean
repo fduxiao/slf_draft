@@ -18,7 +18,7 @@ class Mappoid (M: Type -> Type -> Type) where
   find {α β}: M α β → α → Option β
   empty {α β}: M α β
   union {α β}: M α β → M α β → M α β
-  update {α β} [DecidableEq α]: M α β → α → β → M α β
+  single {α β} [DecidableEq α]: α → β → M α β
   remove {α β} [DecidableEq α]: M α β → α → M α β
   filter {α β}: (α → β → Bool) → M α β → M α β
 
@@ -40,8 +40,13 @@ instance {α β M} [inst: Mappoid M]: GetElem? (M α β) α β (fun m k => k ∈
   getElem? := inst.find
 
 
+def Mappoid.update {α β M} [inst: Mappoid M] [DecidableEq α] (m: M α β) (k: α) (v: β): M α β
+  := inst.union (inst.single k v) m
+
+
 scoped notation:55 m1:55 " ∪ " m2:56 => Mappoid.union m1 m2
 scoped notation:55 m1:55 " ÷ " m2:56 => Mappoid.remove m1 m2
+scoped notation "∅[" k " => " v "]" => Mappoid.single k v
 scoped notation m "[" k " => " v "]" => Mappoid.update m k v
 
 /-!
@@ -161,7 +166,7 @@ instance: Mappoid Map where
     match m1 k with
     | some v => some v
     | none => m2 k
-  update := fun m k v k' => if k = k' then some v else m k'
+  single k v := fun k' => if k = k' then some v else none
   remove := fun m k k' => if k = k' then none else m k'
   filter := fun p m k =>
     match m k with
@@ -226,8 +231,7 @@ theorem Map.empty_finite {α β: Type} :
 := by
   simp [Map.finite, EmptyCollection.emptyCollection, Mappoid.empty]
 
-
-theorem Map.union_finite {α β: Type} (m1 m2: Map α β) :
+theorem Map.union_finite {α β: Type} {m1 m2: Map α β}:
   m1.finite → m2.finite → (m1 ∪ m2).finite
 := by
   intro ⟨l1, H1⟩ ⟨l2, H2⟩
@@ -237,6 +241,12 @@ theorem Map.union_finite {α β: Type} (m1 m2: Map α β) :
   simp [Mappoid.union]
   grind
 
+theorem Map.single_finite {α β: Type} [DecidableEq α] {k: α} {v: β} :
+  (Mappoid.single k v : Map α β).finite
+:= by
+  simp [Map.finite, Mappoid.single]
+  exists [k]
+  grind
 
 theorem Map.update_finite {α β: Type} [DecidableEq α] (m: Map α β) (k: α) (v: β) :
   m.finite → (Mappoid.update m k v).finite
@@ -245,11 +255,10 @@ theorem Map.update_finite {α β: Type} [DecidableEq α] (m: Map α β) (k: α) 
   unfold Map.finite
   exists (k :: l)
   intro k'
-  simp [Mappoid.update]
+  simp [Mappoid.update, Mappoid.single, Mappoid.union]
   grind
 
-
-theorem Map.remove_finite {α β: Type} [DecidableEq α] (m: Map α β) (k: α) :
+theorem Map.remove_finite {α β: Type} [DecidableEq α] {m: Map α β} {k: α}:
   Map.finite m → Map.finite (m ÷ k)
 := by
   intro ⟨l, H⟩
@@ -259,8 +268,7 @@ theorem Map.remove_finite {α β: Type} [DecidableEq α] (m: Map α β) (k: α) 
   simp [Mappoid.remove]
   grind
 
-
-theorem Map.filter_finite {α β: Type} (p: α → β → Bool) (m: Map α β) :
+theorem Map.filter_finite {α β: Type} {p: α → β → Bool} {m: Map α β} :
   Map.finite m → Map.finite (Mappoid.filter p m)
 := by
   intro ⟨l, H⟩
@@ -276,15 +284,14 @@ theorem Map.filter_finite {α β: Type} (p: α → β → Bool) (m: Map α β) :
 -/
 def FMap (α β: Type): Type := { m: Map α β // m.finite }
 
-
 instance: Mappoid FMap where
   find := fun m k => m.val k
   empty := ⟨∅, Map.empty_finite⟩
   union := fun m1 m2 =>
-    ⟨m1.val ∪ m2.val, Map.union_finite m1.val m2.val m1.property m2.property⟩
-  update := fun m k v =>
-    ⟨Mappoid.update m.val k v, Map.update_finite m.val k v m.property⟩
+    ⟨m1.val ∪ m2.val, Map.union_finite m1.property m2.property⟩
+  single := fun k v =>
+    ⟨Mappoid.single k v, Map.single_finite⟩
   remove := fun m k =>
-    ⟨m.val ÷ k, Map.remove_finite m.val k m.property⟩
+    ⟨m.val ÷ k, Map.remove_finite m.property⟩
   filter := fun p m =>
-    ⟨Mappoid.filter p m.val, Map.filter_finite p m.val m.property⟩
+    ⟨Mappoid.filter p m.val, Map.filter_finite m.property⟩
