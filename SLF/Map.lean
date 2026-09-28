@@ -51,6 +51,11 @@ scoped notation:55 m1:55 " ÷ " m2:56 => Mappoid.remove m1 m2
 scoped notation "∅[" k " => " v "]" => Mappoid.single k v
 scoped notation m "[" k " => " v "]" => Mappoid.update m k v
 
+example {α β M} [inst: Mappoid M] [DecidableEq α] (m1 m2 m3: M α β):
+  m1 ∪ m2 ∪ m3 = (m1 ∪ m2) ∪ m3
+:= by
+  rfl
+
 /-!
 This makes sure that the `Membership` relation is decidable. We may have more
 intuitively equivalent definition of properties about `Mappoid`
@@ -74,12 +79,34 @@ instance {α β M} [Mappoid M] {m: M α β} {k: α}: Decidable (k ∈ m) := by
 def Mappoid.disjoint {α β M} [Mappoid M] (m1 m2: M α β) :=
   ∀ (k: α), m1 k = none ∨ m2 k = none
 
-
 scoped notation:50 m1:50 " ⊥ " m2:51 => Mappoid.disjoint m1 m2
+
+def Mappoid.disjoint3 {α β M} [Mappoid M] (m1 m2 m3: M α β) :=
+  m1 ⊥ m2 ∧ m2 ⊥ m3 ∧ m3 ⊥ m1
+
+scoped notation:51 m1:52 " ⊥ " m2:52 " ⊥ " m3:52 => Mappoid.disjoint3 m1 m2 m3
 
 
 def Mappoid.agree {α β M} [Mappoid M] (m1 m2: M α β) :=
   ∀ (k: α) (v1 v2: β), m1 k = some v1 → m2 k = some v2 → v1 = v2
+
+
+scoped notation:50 m1:50 " ↓ " m2:51 => Mappoid.agree m1 m2
+
+@[refl, simp, grind .]
+theorem Mappoid.agree.refl {α β M} [Mappoid M] (m: M α β):
+  m ↓ m
+:= by
+  intro k v1 v2 H1 H2
+  simp_all
+
+
+@[symm, grind .]
+theorem Mappoid.agree_symm {α β M} [Mappoid M] {m1 m2: M α β}:
+  m1 ↓ m2 → m2 ↓ m1
+:= by
+  unfold Mappoid.agree
+  grind
 
 
 /-!
@@ -108,38 +135,51 @@ example {A B: Prop}:
     . left
       assumption
 
-
+@[grind =]
 theorem Mappoid.disjoin_eq {α β M} [Mappoid M] (m1 m2: M α β) :
   m1 ⊥ m2 ↔ ∀ (k: α), k ∉ m1 ∨ k ∉ m2
 := by
   simp [Mappoid.disjoint, Membership.mem]
 
-
-@[symm]
+@[symm, grind .]
 theorem Mappoid.disjoint_symm {α β M} [Mappoid M] (m1 m2: M α β) :
-  m1 ⊥ m2 ↔ m2 ⊥ m1
+  m1 ⊥ m2 → m2 ⊥ m1
 := by
   simp [Mappoid.disjoint]
-  apply Iff.intro
-  . intro H k
-    cases H k
-    . right
-      assumption
-    . left
-      assumption
-  . intro H k
-    cases H k
-    . right
-      assumption
-    . left
-      assumption
+  intro H k
+  cases H k
+  . right
+    assumption
+  . left
+    assumption
 
 
 def Mappoid.eq {α β M} [Mappoid M] (m1 m2: M α β) :=
   ∀ (k: α), m1 k = m2 k
 
-
 scoped notation:50 m1:50 " ≈ " m2:51 => Mappoid.eq m1 m2
+
+@[simp, grind =_]
+theorem Mappoid.eq_iff {α β M} [Mappoid M] (m1 m2: M α β) :
+  (∀ (k: α), m1 k = m2 k) ↔ m1 ≈ m2
+:= by
+  simp [Mappoid.eq]
+
+
+@[refl, grind =]
+theorem Mappoid.eq.refl {α β M} [Mappoid M] (m: M α β): m ≈ m := by
+  intro k
+  simp
+
+
+@[symm, grind .]
+theorem Mappoid.eq.symm {α β M} [Mappoid M] {m1 m2: M α β}:
+  m1 ≈ m2 → m2 ≈ m1
+:= by
+  intro H k
+  specialize H k
+  simp_all
+
 
 class DisjointComm (M: Type -> Type -> Type) extends Mappoid M where
   disjoint_comm {α β} {m1 m2: M α β}:
@@ -175,21 +215,37 @@ instance: Mappoid Map where
     | none => none
     | some v => if p k v then some v else none
 
+
+@[simp, grind .]
+theorem Map.extensionality {α β: Type} {m1 m2: Map α β}:
+  m1 ≈ m2 ↔ m1 = m2
+:= by
+  apply Iff.intro
+  . intro H
+    funext k
+    specialize H k
+    simp [Mappoid.find] at H
+    exact H
+  . intro H
+    rw [H]
+
+
+@[grind =]
 theorem Map.disjoint_comm {α β} {m1 m2: Map α β}:
   m1 ⊥ m2 ->
-  m1 ∪ m2 ≈ m2 ∪ m1
+  m1 ∪ m2 = m2 ∪ m1
 := by
   intro H
-  unfold Mappoid.eq
-  intro k
+  funext k
   cases H k <;>
   . simp [Mappoid.union, Mappoid.find, Union.union, *] at *
     repeat split <;> simp_all
 
 
 instance: DisjointComm Map where
-  disjoint_comm := Map.disjoint_comm
-
+  disjoint_comm := by
+    simp
+    apply Map.disjoint_comm
 
 /-!
 Note that in the original book of SLF, the definition of `finite` is `m k ≠ none -> k ∈ l`.
@@ -281,6 +337,69 @@ theorem Map.filter_finite {α β: Type} {p: α → β → Bool} {m: Map α β} :
   grind
 
 
+@[simp, grind =]
+theorem Map.find_eq {α β: Type} (m: Map α β) (k: α):
+  Mappoid.find m k = m k
+:= by
+  simp [Mappoid.find]
+
+
+@[simp, grind .]
+theorem Map.empty_find {α β: Type} (k: α):
+  (∅ : Map α β) k = none
+:= by
+  simp [Mappoid.empty, EmptyCollection.emptyCollection]
+
+
+@[simp]
+theorem Map.single_elem? {α β} [DecidableEq α] {x: α} {v: β}:
+  (∅ [x => v]: Map α β)[x]? = some v
+:= by
+  simp [EmptyCollection.emptyCollection, Mappoid.empty, Mappoid.update]
+  simp [GetElem?.getElem?, Mappoid.find, Mappoid.single, Mappoid.union]
+
+
+@[simp]
+theorem Map.single_elem! {α β} [DecidableEq α] [Inhabited β] {x: α} {v: β}:
+  (∅ [x => v]: Map α β)[x]! = v
+:= by
+  simp [EmptyCollection.emptyCollection, Mappoid.empty, Mappoid.update]
+  simp [GetElem?.getElem!, Mappoid.find, Mappoid.single, Mappoid.union]
+
+
+@[simp, grind =]
+theorem Map.read_union_left {α β} [DecidableEq α] [Inhabited β] {m1 m2: Map α β} {x: α}:
+  x ∈ m1 →
+  (m1 ∪ m2)[x]! = m1[x]!
+:= by
+  intro H
+  simp [Membership.mem, Mappoid.find] at H
+  simp [Mappoid.union, Union.union, Mappoid.find, GetElem?.getElem!]
+  split
+  . split <;> simp_all
+  . split <;> simp_all
+
+@[simp, grind =]
+theorem Map.read_union_right {α β} [DecidableEq α] [Inhabited β] {m1 m2: Map α β} {x: α}:
+  ¬ x ∈ m1 →
+  (m1 ∪ m2)[x]! = m2[x]!
+:= by
+  intro H
+  simp [Membership.mem, Mappoid.find] at H
+  simp [Mappoid.union, Union.union, Mappoid.find, GetElem?.getElem!]
+  split
+  . split <;> simp_all
+  . split <;> simp_all
+
+
+@[simp, grind =]
+theorem Map.update_single_eq {α β} [DecidableEq α] {k: α} {v: β}:
+  ∅[k => v] [k => v] = (∅[k => v] : Map α β)
+:= by
+  simp [Mappoid.update, Mappoid.union]
+  funext
+  grind
+
 /-!
 ## Implementation of `FMap`
 -/
@@ -297,3 +416,624 @@ instance: Mappoid FMap where
     ⟨m.val ÷ k, Map.remove_finite m.property⟩
   filter := fun p m =>
     ⟨Mappoid.filter p m.val, Map.filter_finite m.property⟩
+
+
+/-!
+### Properties of `FMap`
+-/
+
+@[simp, grind =]
+theorem FMap.find_eq {α β: Type} (m: FMap α β) (k: α):
+  Mappoid.find m k = m k
+:= by
+  simp [Mappoid.find]
+
+@[simp, grind =]
+theorem FMap.find_eq_func {α β: Type} (m: FMap α β) (k: α):
+  m k = m.val k
+:= by
+  simp [Mappoid.find]
+
+@[grind =]
+theorem FMap.mem_eq {α β: Type} (m: FMap α β) (k: α):
+  k ∈ m ↔ k ∈ m.val
+:= by
+  simp [Membership.mem, Mappoid.find]
+
+@[grind =_]
+theorem FMap.eq_iff {α β } (m1 m2: FMap α β) :
+  m1 = m2 ↔ m1.val = m2.val
+:= by
+  apply Subtype.ext_iff
+
+
+@[simp, grind =]
+theorem FMap.extensionality {α β: Type} {m1 m2: FMap α β} :
+  m1 ≈ m2 ↔ m1 = m2
+:= by
+  apply Iff.intro
+  . intro H
+    apply Subtype.ext_iff.mpr
+    apply Map.extensionality.mp
+    exact H
+  . intro H
+    rw [H]
+
+@[simp, grind =]
+theorem FMap.union_val {α β: Type} {m1 m2: FMap α β} :
+  (Mappoid.union m1 m2).val = Mappoid.union m1.val m2.val
+:= by
+  funext k
+  simp [Mappoid.union, Union.union]
+
+@[simp, grind =]
+theorem FMap.union_val' {α β: Type} {m1 m2: FMap α β} :
+  (m1 ∪ m2).val = m1.val ∪ m2.val
+:= by
+  funext k
+  simp [Mappoid.union, Union.union]
+
+@[simp, grind =]
+theorem FMap.single_val {α β: Type} [DecidableEq α] {k: α} {v: β} :
+  (∅[k => v]: FMap α β).val = ∅[k => v]
+:= by
+  simp [Mappoid.single]
+  funext
+  rfl
+
+@[simp, grind =]
+theorem FMap.update_val {α β: Type} [DecidableEq α] {m: FMap α β} {k: α} {v: β} :
+  (m[k => v]).val = m.val[k => v]
+:= by
+  simp [Mappoid.update]
+
+@[grind =]
+theorem FMap.disjoint_val {α β: Type} {m1 m2: FMap α β} :
+  (m1 ⊥ m2) ↔ (m1.val ⊥ m2.val)
+:= by
+  simp_all [Mappoid.disjoint, Mappoid.find]
+
+@[simp, grind =]
+theorem FMap.remove_val {α β: Type} [DecidableEq α] {m: FMap α β} {k: α} :
+  (m ÷ k).val = m.val ÷ k
+:= by
+  funext k
+  simp [Mappoid.remove]
+
+/-!
+#### Domain
+-/
+@[grind .]
+theorem FMap.mem_single_eq {α β} [DecidableEq α] {x y: α} {v: β}:
+  y ∈ (∅[x => v]: FMap α β) → y = x
+:= by
+  intro H
+  simp [Membership.mem, Mappoid.find, Mappoid.single] at H
+  simp_all
+
+@[simp, grind .]
+theorem FMap.mem_single {α β} [DecidableEq α] {x: α} {v: β}:
+  x ∈ (∅[x => v]: FMap α β)
+:= by
+  simp [Membership.mem, Mappoid.find, Mappoid.single]
+
+@[grind =]
+theorem FMap.mem_union {α β} {m1 m2: FMap α β} {k: α}:
+  k ∈ m1 ∪ m2 ↔ k ∈ m1 ∨ k ∈ m2
+:= by
+  simp [Membership.mem, Mappoid.find, Mappoid.union, Union.union]
+  grind
+
+@[grind .]
+theorem FMap.mem_union_left {α β} {m1 m2: FMap α β} {k: α}:
+  k ∈ m1 → k ∈ m1 ∪ m2
+:= by
+  grind
+
+@[grind .]
+theorem FMap.mem_union_right {α β} {m1 m2: FMap α β} {k: α}:
+  k ∈ m2 → k ∈ m1 ∪ m2
+:= by
+  grind
+
+@[grind .]
+theorem FMap.update_eq {α β} [DecidableEq α] {m: FMap α β} {x y: α} {v: β}:
+  y ∈ m [x => v] → (x = y ∨ y ∈ m)
+:= by
+  intro H
+  simp [Membership.mem, Mappoid.update, Mappoid.find, Mappoid.single, Mappoid.union, Union.union] at H
+  split at H
+  . simp_all
+  . simp_all [Membership.mem, Mappoid.find]
+
+@[grind .]
+theorem FMap.remove_eq {α β} [DecidableEq α] {m: FMap α β} {x y: α}:
+  y ∈ m ÷ x → (x ≠ y ∧ y ∈ m)
+:= by
+  intro H
+  simp [Membership.mem, Mappoid.remove, Mappoid.find] at H
+  rcases H with ⟨H1, H2⟩
+  and_intros
+  . simp_all
+  . simp_all [Membership.mem, Mappoid.find]
+
+@[grind .]
+theorem FMap.disjoint_single_of_not_indom {α β} [DecidableEq α] {m: FMap α β} {x: α} {v: β}:
+  x ∉ m → (∅[x => v]: FMap α β) ⊥ m
+:= by
+  grind
+
+/-!
+#### Disjointness
+-/
+@[simp, grind =]
+theorem FMap.disjoint_comm {α β} {m1 m2: FMap α β}:
+  m1 ⊥ m2 ->
+  m1 ∪ m2 = m2 ∪ m1
+:= by
+  intro H
+  apply Subtype.ext_iff.mpr
+  apply Map.disjoint_comm
+  grind
+
+@[simp, grind .]
+theorem FMap.disjoint_empty_left {α β} (m: FMap α β) :
+  ∅ ⊥ m
+:= by
+  intro k
+  left
+  simp [Mappoid.find, Mappoid.empty, EmptyCollection.emptyCollection]
+
+@[simp, grind .]
+theorem FMap.disjoint_empty_right {α β} (m: FMap α β) :
+  m ⊥ ∅
+:= by
+  symm
+  apply FMap.disjoint_empty_left
+
+@[simp, grind =]
+theorem FMap.disjoint_union_eq_right {α β} {m1 m2 m3: FMap α β}:
+  m1 ⊥ (m2 ∪ m3) ↔ (m1 ⊥ m2 ∧ m1 ⊥ m3)
+:= by
+  grind
+
+@[simp, grind =]
+theorem FMap.disjoint_union_eq_left {α β} {m1 m2 m3: FMap α β}:
+  (m1 ∪ m2) ⊥ m3 ↔ (m1 ⊥ m3 ∧ m2 ⊥ m3)
+:= by
+  grind
+
+@[simp, grind =]
+theorem FMap.disjoint_single_single {α β} [DecidableEq α] {x1 x2: α} {v1 v2: β}:
+  (∅[x1 => v1]: FMap α β) ⊥ (∅[x2 => v2]: FMap α β) ↔ x1 ≠ x2
+:= by
+  grind
+
+@[simp, grind .]
+theorem FMap.disjoint_single_set {α β} [DecidableEq α] {x: α} {v1 v2: β} {m: FMap α β}:
+  (∅[x => v1]: FMap α β) ⊥ m → (∅[x => v2]: FMap α β) ⊥ m
+:= by
+  grind
+
+@[simp, grind .]
+theorem FMap.disjoint_update_left {α β} [DecidableEq α] {m1 m2: FMap α β} {x: α} {v: β}:
+  m1 ⊥ m2 →
+  x ∈ m1 →
+  (m1 [x => v]) ⊥ m2
+:= by
+  grind
+
+@[simp, grind .]
+theorem FMap.disjoint_update_not_right {α β} [DecidableEq α] {m1 m2: FMap α β} {x: α} {v: β}:
+  m1 ⊥ m2 →
+  (¬ x ∈ m2) →
+  m1 [x => v] ⊥ m2
+:= by
+  grind
+
+@[simp, grind .]
+theorem FMap.disjoin_remove_left {α β} [DecidableEq α] {m1 m2: FMap α β} {x: α}:
+  m1 ⊥ m2 →
+  (m1 ÷ x) ⊥ m2
+:= by
+  grind
+
+/-!
+#### Union
+-/
+@[simp, grind =]
+theorem FMap.union_self {α β} [DecidableEq α] {m: FMap α β}:
+  m ∪ m = m
+:= by
+  apply Subtype.ext_iff.mpr
+  funext k
+  simp [Mappoid.union, Union.union]
+  grind
+
+@[simp, grind =]
+theorem FMap.union_empty_left {α β} [DecidableEq α] {m: FMap α β}:
+  ∅ ∪ m = m
+:= by
+  apply Subtype.ext_iff.mpr
+  funext k
+  simp [Mappoid.union, Union.union, Mappoid.empty, EmptyCollection.emptyCollection]
+
+@[simp, grind =]
+theorem FMap.union_empty_right {α β} [DecidableEq α] {m: FMap α β}:
+  m ∪ ∅ = m
+:= by
+  grind
+
+@[grind .]
+theorem FMap.union_eq_empty_inv_left {α β} [DecidableEq α] {m1 m2: FMap α β}:
+  m1 ∪ m2 = ∅ → m1 = ∅
+:= by
+  intro H
+  apply Subtype.ext_iff.mpr
+  replace H := congrArg (fun m => m.val) H
+  simp at H
+  funext k
+  replace H := congrFun H k
+  simp_all [Mappoid.empty, Mappoid.union, Union.union, EmptyCollection.emptyCollection]
+  split at H <;> simp_all
+
+@[grind .]
+theorem FMap.union_eq_empty_inv_right {α β} [DecidableEq α] {m1 m2: FMap α β}:
+  m1 ∪ m2 = ∅ → m2 = ∅
+:= by
+  grind
+
+@[simp, grind =]
+theorem FMap.agree_union_comm {α β} [DecidableEq α] {m1 m2: FMap α β}:
+  m1 ↓ m2 →
+  m1 ∪ m2 = m2 ∪ m1
+:= by
+  intro H
+  simp [Mappoid.agree, Mappoid.find] at H
+  apply Subtype.ext_iff.mpr
+  funext k
+  simp [Mappoid.union, Union.union]
+  grind
+
+@[simp, grind =]
+theorem FMap.union_assoc {α β} [DecidableEq α] {m1 m2 m3: FMap α β}:
+  m1 ∪ (m2 ∪ m3) = (m1 ∪ m2) ∪ m3
+:= by
+  apply Subtype.ext_iff.mpr
+  funext k
+  simp [Mappoid.union, Union.union]
+  grind
+
+@[grind .]
+theorem FMap.union_eq_inv_of_disjoint {α β} [DecidableEq α] {m1 m1' m2: FMap α β}:
+  m1 ⊥ m2 →
+  m1' ⊥ m2 →
+  m1 ∪ m2 = m1' ∪ m2 →
+  m1 = m1'
+:= by
+  intro H1 H2 H3
+  apply Subtype.ext_iff.mpr
+  replace H3 := congrArg (fun m => m.val) H3
+  simp at H3
+  funext k
+  replace H3 := congrFun H3 k
+  simp_all [Mappoid.union, Union.union, Mappoid.find, Mappoid.disjoint]
+  grind
+
+/-!
+#### Compatibility
+-/
+
+@[simp, grind .]
+theorem FMap.agree.ofUnion {α β} [DecidableEq α] {m1 m2: FMap α β}:
+  m1 ⊥ m2 →
+  m1 ↓ m2
+:= by
+  unfold Mappoid.agree Mappoid.disjoint
+  grind
+
+instance {α β} {m1 m2: FMap α β} [DecidableEq α]: Coe (m1 ⊥ m2) (m1 ↓ m2) where
+  coe := FMap.agree.ofUnion
+
+@[simp, grind .]
+theorem FMap.agree_empty_left {α β} [DecidableEq α] {m: FMap α β}:
+  ∅ ↓ m
+:= by
+  grind
+
+@[simp, grind .]
+theorem FMap.agree_empty_right {α β} [DecidableEq α] {m: FMap α β}:
+  m ↓ ∅
+:= by
+  grind
+
+@[simp, grind .]
+theorem FMap.agree_union_left {α β} [DecidableEq α] {m1 m2 m3: FMap α β}:
+  m1 ↓ m3 →
+  m2 ↓ m3 →
+  m1 ∪ m2 ↓ m3
+:= by
+  unfold Mappoid.agree
+  simp [Mappoid.union, Union.union]
+  grind
+
+@[simp, grind .]
+theorem FMap.agree_union_right {α β} [DecidableEq α] {m1 m2 m3: FMap α β}:
+  m1 ↓ m2 →
+  m1 ↓ m3 →
+  m1 ↓ (m2 ∪ m3)
+:= by
+  grind
+
+@[simp, grind .]
+theorem FMap.agree_union_lr {α β} [DecidableEq α] {m1 n1 m2 n2: FMap α β}:
+  n1 ↓ n2 →
+  (m1 ⊥ m2 ⊥ (n1 ∪ n2)) →
+  (m1 ∪ m2) ↓ (n1 ∪ n2)
+:= by
+  unfold Mappoid.disjoint3
+  grind
+
+@[simp, grind .]
+theorem FMap.agree_union_ll_inv {α β} [DecidableEq α] {m1 m2 m3: FMap α β}:
+  (m1 ∪ m2) ↓ m3 →
+  m1 ↓ m3
+:= by
+  intro H
+  simp_all [Mappoid.agree, Mappoid.union, Union.union, Mappoid.find]
+  grind
+
+@[simp, grind .]
+theorem FMap.agree_union_rl_inv {α β} [DecidableEq α] {m1 m2 m3: FMap α β}:
+  m1 ↓ (m2 ∪ m3) →
+  m1 ↓ m2
+:= by
+  grind
+
+theorem FMap.agree_union_lr_inv_agree_agree {α β} [DecidableEq α] {m1 m2 m3: FMap α β}:
+  (m1 ∪ m2) ↓ m3 →
+  m1 ↓ m2 →
+  m1 ↓ m3
+:= by
+  grind
+
+theorem FMap.agree_union_rr_inv_agree {α β} [DecidableEq α] {m1 m2 m3: FMap α β}:
+  m1 ↓ (m2 ∪ m3) →
+  m2 ↓ m3 →
+  m1 ↓ m3
+:= by
+  grind
+
+theorem FMap.agree_union_l_inv {α β} [DecidableEq α] {m1 m2 m3: FMap α β}:
+  (m1 ∪ m2) ↓ m3 →
+  m1 ↓ m2 →
+  m1 ↓ m3 ∧ m2 ↓ m3
+:= by
+  grind
+
+theorem FMap.agree_union_r_inv {α β} [DecidableEq α] {m1 m2 m3: FMap α β}:
+  m1 ↓ (m2 ∪ m3) →
+  m2 ↓ m3 →
+  m1 ↓ m2 ∧ m1 ↓ m3
+:= by
+  grind
+
+
+/-!
+#### Read
+-/
+@[simp, grind =]
+theorem FMap.elem!_eq {α β} [DecidableEq α] [Inhabited β] {m: FMap α β} {x: α}:
+  m[x]! = m.val[x]!
+:= by
+  simp [GetElem?.getElem!, Mappoid.find]
+
+@[simp, grind =]
+theorem FMap.elem?_eq {α β} [DecidableEq α] [Inhabited β] {m: FMap α β} {x: α}:
+  m[x]? = m.val[x]?
+:= by
+  simp [GetElem?.getElem?, Mappoid.find]
+
+@[simp]
+theorem FMap.single_elem? {α β} [DecidableEq α] [Inhabited β] {x: α} {v: β}:
+  (∅[x => v]: FMap α β)[x]? = some v
+:= by
+  simp [Mappoid.single]
+  simp [GetElem?.getElem?, Mappoid.find]
+
+@[simp]
+theorem FMap.read_single {α β} [DecidableEq α] [Inhabited β] {x: α} {v: β}:
+  (∅[x => v]: FMap α β)[x]! = v
+:= by
+  simp [Mappoid.single]
+  simp [GetElem?.getElem!, Mappoid.find]
+
+@[simp, grind =]
+theorem FMap.read_union_left {α β} [DecidableEq α] [Inhabited β] {m1 m2: FMap α β} {x: α}:
+  x ∈ m1 →
+  (m1 ∪ m2)[x]! = m1[x]!
+:= by
+  intro H
+  simp
+  apply Map.read_union_left
+  simp_all [Membership.mem, Mappoid.find]
+
+@[simp, grind =]
+theorem FMap.read_union_right {α β} [DecidableEq α] [Inhabited β] {m1 m2: FMap α β} {x: α}:
+  ¬ x ∈ m1 →
+  (m1 ∪ m2)[x]! = m2[x]!
+:= by
+  intro H
+  simp
+  apply Map.read_union_right
+  simp_all [Membership.mem, Mappoid.find]
+
+/-!
+#### Update
+-/
+/--
+Note that `∅ [k => v]` is different from `∅[k => v]`. The former is `Mappoid.update` while
+the latter is `Mappoid.single`. The theorem states that they are equal.
+-/
+@[simp, grind =]
+theorem FMap.update_empty {α β} [DecidableEq α] {k: α} {v: β}:
+  (∅ [k => v] : FMap α β) = (∅[k => v] : FMap α β)
+:= by
+  simp [Mappoid.update, EmptyCollection.emptyCollection]
+  simp [Mappoid.union, Union.union, Mappoid.empty, Mappoid.single]
+  grind
+
+theorem FMap.union_single_eq {α β} [DecidableEq α] {m: FMap α β} {k: α} {v: β}:
+  (∅[k => v] ∪ m : FMap α β) = m[k => v]
+:= by
+  simp [Mappoid.update, Union.union]
+
+@[simp, grind =]
+theorem FMap.update_single_eq {α β} [DecidableEq α] {k: α} {v: β}:
+  ∅[k => v] [k => v] = (∅[k => v] : FMap α β)
+:= by
+  simp [FMap.eq_iff]
+
+
+@[simp, grind =]
+theorem FMap.update_union_left {α β} [DecidableEq α] {m1 m2: FMap α β} {k: α} {v: β}:
+  k ∈ m1 →
+  (m1 ∪ m2)[k => v] = m1[k => v] ∪ m2
+:= by
+  intro H
+  simp [Mappoid.update, Union.union, Mappoid.union]
+  grind
+
+
+@[simp, grind =]
+theorem FMap.update_union_right {α β} [DecidableEq α] {m1 m2: FMap α β} {k: α} {v: β}:
+  ¬ k ∈ m1 →
+  (m1 ∪ m2)[k => v] = m1 ∪ m2[k => v]
+:= by
+  intro H
+  apply Subtype.ext_iff.mpr
+  funext k'
+  simp_all [Mappoid.update, Union.union, Mappoid.union, Mappoid.single, Membership.mem, Mappoid.find]
+  grind
+
+@[simp, grind =]
+theorem FMap.update_union_not_left {α β} [DecidableEq α] {m1 m2: FMap α β} {k: α} {v: β}:
+  ¬ k ∈ m1 →
+  (m1 ∪ m2)[k => v] = m1 ∪ m2[k => v]
+:= by
+  grind
+
+@[simp, grind =]
+theorem FMap.update_union_not_right {α β} [DecidableEq α] {m1 m2: FMap α β} {k: α} {v: β}:
+  ¬ k ∈ m2 →
+  (m1 ∪ m2)[k => v] = m1[k => v] ∪ m2
+:= by
+  intro H
+  apply Subtype.ext_iff.mpr
+  funext k'
+  simp_all [Mappoid.update, Union.union, Mappoid.union, Mappoid.single, Membership.mem, Mappoid.find]
+  grind
+
+/-!
+#### Removal
+-/
+@[simp, grind =]
+theorem FMap.remove_empty {α β} [DecidableEq α] {k: α}:
+  (∅ ÷ k : FMap α β) = ∅
+:= by
+  simp [Mappoid.remove, EmptyCollection.emptyCollection, Mappoid.empty]
+  grind
+
+@[simp, grind =]
+theorem FMap.remove_single {α β} [DecidableEq α] {k: α} {v}:
+  (∅[k => v] ÷ k : FMap α β) = ∅
+:= by
+  simp [Mappoid.remove, EmptyCollection.emptyCollection, Mappoid.empty, Mappoid.single]
+  grind
+
+@[simp, grind =]
+theorem FMap.remove_disjoint_left {α β} [DecidableEq α] {m1 m2: FMap α β} {k: α}:
+  k ∈ m1 →
+  m1 ⊥ m2 →
+  (m1 ∪ m2) ÷ k = (m1 ÷ k) ∪ m2
+:= by
+  intro H1 H2
+  simp [FMap.mem_eq] at H1
+  apply Subtype.ext_iff.mpr
+  simp_all
+  simp [Membership.mem] at H1
+  simp [Mappoid.disjoint] at H2
+  funext k'
+  specialize H2 k'
+  simp [Mappoid.remove, Mappoid.union, Union.union]
+  split
+  . split <;> simp_all
+  . split <;> grind
+
+@[simp, grind =]
+theorem FMap.remove_union_single_left {α β} [DecidableEq α] {m: FMap α β} {k: α} {v: β}:
+  ¬ k ∈ m →
+  (∅[k => v] ∪ m) ÷ k = m
+:= by
+  grind
+
+@[simp, grind =]
+theorem FMap.remove_update_left {α β} [DecidableEq α] {m: FMap α β} {k: α} {v: β}:
+  ¬ k ∈ m →
+  (m[k => v]) ÷ k = m
+:= by
+  exact FMap.remove_union_single_left
+
+/-!
+#### Tactics
+-/
+macro "fmap_simp" : tactic => `(tactic|
+  (try unfold Mappoid.disjoint3 at *) <;> try simp_all [
+  FMap.union_assoc, FMap.union_empty_left, FMap.union_empty_right,
+  FMap.union_self,
+  FMap.disjoint_union_eq_left, FMap.disjoint_union_eq_right,
+  FMap.disjoint_empty_left, FMap.disjoint_empty_right,
+  FMap.disjoint_comm, FMap.agree_union_lr,
+  FMap.agree_union_ll_inv, FMap.agree_union_rl_inv, FMap.agree_union_rr_inv_agree,
+  FMap.agree_union_l_inv, FMap.agree_union_r_inv
+
+])
+
+macro "fmap_eq": tactic => `(tactic|
+  fmap_simp <;>
+  intros <;>
+  apply Subtype.ext_iff.mpr <;>
+  funext <;>
+  grind
+)
+
+macro "fmap" : tactic => `(tactic| fmap_simp <;> (try grind) <;> fmap_eq)
+
+theorem FMap.union_eq_cancel_1 {α β} [DecidableEq α] {m1 m2 m2': FMap α β}:
+  m2 = m2' →
+  m1 ∪ m2 = m1 ∪ m2'
+:= by
+  fmap
+
+theorem FMap.union_eq_cancel_2 {α β} [DecidableEq α] {m1 m1' m2 m2': FMap α β}:
+  m1 ⊥ m1' →
+  m2 = m1' ∪ m2' →
+  m1 ∪ m2 = m1' ∪ m1 ∪ m2'
+:= by
+  fmap
+
+
+theorem FMap.union_eq_cancel_3 {α β} [DecidableEq α] {m1 m1' m2 m2' m3': FMap α β}:
+  m1 ⊥ (m1' ∪ m2') →
+  m2 = m1' ∪ (m2' ∪ m3') →
+  m1 ∪ m2 = m1' ∪ m2' ∪ m1 ∪ m3'
+:= by
+  fmap
+
+theorem FMap.fmap_eq_demo {α β} [DecidableEq α] {m1 m2 m3 m4 m5: FMap α β}:
+  m1 ⊥ m2 ⊥ m3 →
+  (m1 ∪ m2 ∪ m3) ⊥ m4 ⊥ m5 →
+  m1 = m2 ∪ m3 →
+  m4 ∪ m1 ∪ m5 = m2 ∪ m5 ∪ m4 ∪ m3
+:= by
+  fmap
