@@ -40,11 +40,13 @@ instance {α β M} [inst: Mappoid M]: GetElem? (M α β) α β (fun m k => k ∈
   getElem? := inst.find
 
 
+instance {α β M} [inst: Mappoid M]: Union (M α β) where
+  union := inst.union
+
 def Mappoid.update {α β M} [inst: Mappoid M] [DecidableEq α] (m: M α β) (k: α) (v: β): M α β
   := inst.union (inst.single k v) m
 
 
-scoped notation:55 m1:55 " ∪ " m2:56 => Mappoid.union m1 m2
 scoped notation:55 m1:55 " ÷ " m2:56 => Mappoid.remove m1 m2
 scoped notation "∅[" k " => " v "]" => Mappoid.single k v
 scoped notation m "[" k " => " v "]" => Mappoid.update m k v
@@ -181,7 +183,7 @@ theorem Map.disjoint_comm {α β} {m1 m2: Map α β}:
   unfold Mappoid.eq
   intro k
   cases H k <;>
-  . simp [Mappoid.union, Mappoid.find, *] at *
+  . simp [Mappoid.union, Mappoid.find, Union.union, *] at *
     repeat split <;> simp_all
 
 
@@ -238,7 +240,7 @@ theorem Map.union_finite {α β: Type} {m1 m2: Map α β}:
   unfold Map.finite
   exists (l1 ++ l2)
   intro k
-  simp [Mappoid.union]
+  simp [Mappoid.union, Union.union]
   grind
 
 theorem Map.single_finite {α β: Type} [DecidableEq α] {k: α} {v: β} :
