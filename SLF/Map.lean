@@ -136,13 +136,20 @@ example {A B: Prop}:
       assumption
 
 @[grind =]
-theorem Mappoid.disjoin_eq {α β M} [Mappoid M] (m1 m2: M α β) :
+theorem Mappoid.disjoin_eq {α β M} [Mappoid M] {m1 m2: M α β} :
   m1 ⊥ m2 ↔ ∀ (k: α), k ∉ m1 ∨ k ∉ m2
 := by
   simp [Mappoid.disjoint, Membership.mem]
 
+@[grind =]
+theorem Mappoid.disjoin_imp {α β M} [Mappoid M] {m1 m2: M α β}:
+  m1 ⊥ m2 ↔ (∀ k, k ∈ m1 → ¬ k ∈ m2)
+:= by
+  simp_all [Mappoid.disjoint, Membership.mem]
+  grind
+
 @[symm, grind .]
-theorem Mappoid.disjoint_symm {α β M} [Mappoid M] (m1 m2: M α β) :
+theorem Mappoid.disjoint_symm {α β M} [Mappoid M] {m1 m2: M α β} :
   m1 ⊥ m2 → m2 ⊥ m1
 := by
   simp [Mappoid.disjoint]
@@ -424,7 +431,7 @@ instance: Mappoid FMap where
 
 @[simp, grind =]
 theorem FMap.find_eq {α β: Type} (m: FMap α β) (k: α):
-  Mappoid.find m k = m k
+  Mappoid.find m k = m.val k
 := by
   simp [Mappoid.find]
 
@@ -439,6 +446,27 @@ theorem FMap.mem_eq {α β: Type} (m: FMap α β) (k: α):
   k ∈ m ↔ k ∈ m.val
 := by
   simp [Membership.mem, Mappoid.find]
+
+theorem FMap.mem_spec {α β: Type} (m: FMap α β):
+  ∃ (l: List α), ∀ (k: α), k ∈ m ↔ k ∈ l
+:= by
+  rcases m with ⟨m, F⟩
+  simp [Map.finite] at F
+  rcases F with ⟨l, H⟩
+  let l' := l.filter (fun k => (m k).isSome)
+  exists l'
+  simp_all [Membership.mem, Mappoid.find]
+  intro k
+  apply Iff.intro
+  . intro H'
+    cases H k <;> try contradiction
+    apply List.mem_filter.mpr
+    simp_all [Option.isSome]
+    split <;> simp_all
+  . intro H
+    have ⟨_, H⟩ := List.mem_filter.mp H
+    unfold Option.isSome at H
+    split at H <;> simp_all
 
 @[grind =_]
 theorem FMap.eq_iff {α β } (m1 m2: FMap α β) :
@@ -458,6 +486,31 @@ theorem FMap.extensionality {α β: Type} {m1 m2: FMap α β} :
     exact H
   . intro H
     rw [H]
+
+@[simp, grind .]
+theorem FMap.congr {α β: Type} {m1 m2: FMap α β} :
+  m1 = m2 -> forall k, m1 k = m2 k
+:= by
+  grind
+
+@[simp, grind =]
+theorem FMap.empty_find {α β: Type} (k: α):
+  (∅: FMap α β) k = none
+:= by
+  simp [Mappoid.find]
+  apply Map.empty_find
+
+@[simp, grind .]
+theorem FMap.empty_find' {α β: Type} (k: α):
+  (∅: FMap α β).val k = none
+:= by
+  apply Map.empty_find
+
+@[simp, grind .]
+theorem FMap.single_find_same {α β: Type} [DecidableEq α] {x: α} {v: β}:
+  (∅[x => v]: FMap α β) x = v
+:= by
+  simp [Mappoid.find, Mappoid.single]
 
 @[simp, grind =]
 theorem FMap.union_val {α β: Type} {m1 m2: FMap α β} :
@@ -1037,3 +1090,164 @@ theorem FMap.fmap_eq_demo {α β} [DecidableEq α] {m1 m2 m3 m4 m5: FMap α β}:
   m4 ∪ m1 ∪ m5 = m2 ∪ m5 ∪ m4 ∪ m3
 := by
   fmap
+
+/-!
+### Existence of Fresh Locations
+#### New location in a list
+-/
+
+def FMap.newLoc (l: List Nat): Nat := 1 + l.foldr (· + ·) 0
+
+theorem FMap.newLoc_le {l: List Nat} {n: Nat}:
+  n ∈ l → n < FMap.newLoc l
+:= by
+  intro H
+  induction l generalizing n
+    <;> simp_all [FMap.newLoc, List.foldr]
+    <;> grind
+
+theorem FMap.newLoc_ge (l: List Nat):
+  ∃ n, ∀ i, (n + i) ∉ l
+:= by
+  exists FMap.newLoc l
+  intro i contra
+  replace contra := FMap.newLoc_le contra
+  omega
+
+theorem FMap.exists_refresh_ge {β} {null} {m: FMap Nat β}:
+  ∃ n, (∀ i, n + i ∉ m) ∧ n ≠ null
+:= by
+  have ⟨l, H⟩ := m.mem_spec
+  rcases FMap.newLoc_ge (null :: l) with ⟨n, H1⟩
+  exists n
+  grind [H1 0]
+
+theorem FMap.newLoc_not_mem (l: List Nat):
+  ∃ n, n ∉ l
+:= by
+  rcases FMap.newLoc_ge l with ⟨n, H⟩
+  exists n
+  exact H 0
+
+theorem FMap.exists_refresh {β} {null} {m: FMap Nat β}:
+  ∃ n, n ∉ m ∧ n ≠ null
+:= by
+  have ⟨n, H1, H2⟩ := m.exists_refresh_ge (null := null)
+  exists n
+  grind [H1 0]
+
+theorem FMap.single_refresh {β} {null} {m: FMap Nat β} {v}:
+  ∃ x: Nat, ∅[x => v] ⊥ m ∧ x ≠ null
+:= by
+  have ⟨x, H1, H2⟩ := m.exists_refresh (null := null)
+  exists x
+  grind
+
+/-!
+#### Consecutive locations in a `FMap`
+-/
+@[simp, grind =]
+def FMap.conseq {β} (vs: List β) (start: Nat): FMap Nat β :=
+  match vs with
+  | [] => ∅
+  | v :: vs' => (∅[start => v]) ∪ FMap.conseq vs' (start + 1)
+
+@[simp, grind =]
+theorem FMap.conseq_elem_spec {β} {vs: List β} {start: Nat} {k: Nat}:
+  k ∈ FMap.conseq vs start ↔ (start ≤ k ∧ k < start + vs.length)
+:= by
+  induction vs generalizing start
+  case nil =>
+    simp [FMap.conseq, Membership.mem, Mappoid.find, Mappoid.empty, EmptyCollection.emptyCollection]
+  case cons v vs' IH =>
+    simp
+    grind
+
+theorem FMap.conseq_refresh {β} {null} {m: FMap Nat β} {vs: List β}:
+  ∃ x: Nat, FMap.conseq vs x ⊥ m ∧ x ≠ null
+:= by
+  have ⟨x, H1, H2⟩ := m.exists_refresh_ge (null := null)
+  exists x
+  simp_all
+  symm
+  apply Mappoid.disjoin_imp.mpr
+  intro k H contra
+  simp_all
+  -- Now that we have `x ≤ k` in `contra`, we have `k = x + (k - x)`.
+  -- But `H1` tells us that `x + i ∉ m` for any `i`, which contradicts `H`.
+  have _: x + (k - x) ∈ m := by grind
+  specialize H1 (k - x)
+  contradiction
+
+theorem FMap.disjoint_single_conseq {β} {x y: Nat} {v} {vs: List β}:
+  x < y ∨ x ≥ y + vs.length →
+  ∅[x => v] ⊥ FMap.conseq vs y
+:= by
+  grind
+
+def FMap.fresh {β} (null: Nat) (m: FMap Nat β) (x: Nat): Prop :=
+  x ∉ m ∧ x ≠ null
+
+instance FMap.fresh_decidable {β} {null: Nat} {m: FMap Nat β} {x: Nat}:
+  Decidable (FMap.fresh null m x)
+:= by
+  unfold FMap.fresh
+  cases E: m x
+  case some _ =>
+    apply Decidable.isFalse
+    simp only [Membership.mem]
+    simp_all
+  case none =>
+    simp_all [Membership.mem]
+    cases E': x == null
+    case true =>
+      simp_all
+      apply isFalse
+      simp
+    case false =>
+      simp_all
+      apply isTrue
+      trivial
+
+def FMap.smallest_fresh {β} (null: Nat) (m: FMap Nat β) (x: Nat): Prop :=
+  FMap.fresh null m x ∧ ∀ y, y < x → ¬ FMap.fresh null m y
+
+theorem Nat.well_ordered {P: Nat → Prop} [inst: ∀ n, Decidable (P n)]:
+  (∃ n, P n) →
+  ∃ m, P m ∧ ∀ k, k < m → ¬ P k
+:= by
+  rintro ⟨n, hn⟩
+  let l := List.range (n + 1)
+  let h := l.find? (fun k => P k)  -- since P is decidable.
+  have _: h ≠ none := by
+    intro h
+    replace h := List.find?_range_eq_none.mp h
+    specialize h n
+    simp at h
+    contradiction
+  have ⟨m, hm⟩: exists m, h = some m := by
+    cases E: h with
+    | none => contradiction
+    | some m => exists m
+  replace hm := List.find?_range_eq_some.mp hm
+  simp at hm
+  rcases hm with ⟨_, _, _⟩
+  exists m
+
+theorem FMap.smallest_fresh_exists {β} {null} {m: FMap Nat β}:
+  ∃ x, FMap.smallest_fresh null m x
+:= by
+  unfold FMap.smallest_fresh
+  apply Nat.well_ordered
+  rcases m.exists_refresh (null := null) with ⟨x, H1, H2⟩
+  exists x
+
+@[simp]
+theorem FMap.exists_nonempty {β} [Inhabited β]:
+  ∃ m, m ≠ (∅: FMap Nat β)
+:= by
+  exists ∅[0 => default]
+  intro H
+  replace H := FMap.congr H 0
+  simp at H
+  simp [Mappoid.single] at H
