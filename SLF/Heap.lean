@@ -79,7 +79,7 @@ def HProp.forall {α} (Q: α → HProp): HProp :=
   fun h => ∀ a, Q a h
 
 -- notations
-scoped notation "emp" => HProp.empty
+scoped notation "\\[]" => HProp.empty
 scoped notation:68 p " ~~> " v:68 => HProp.single p v
 scoped notation:59 H1:59 " ** " H2:59 => HProp.star H1 H2
 declare_syntax_cat binder (behavior := symbol)
@@ -94,21 +94,21 @@ macro_rules
   | `([fun _ : $t | $Q]) => `(fun _ : $t => $Q)
   | `([fun ($b: binder) | $Q]) => `([fun $b | $Q])
 
-scoped syntax:59 "∃' " binder+ ", " term:51: term
-scoped syntax:59 "∀' " binder+ ", " term:51: term
+scoped syntax:59 "\\∃ " binder+ ", " term:51: term
+scoped syntax:59 "\\∀ " binder+ ", " term:51: term
 macro_rules
-  | `(∃' $b, $Q) => `(HProp.exists ([fun $b | $Q]))
-  | `(∃' $b $[$b']*, $Q) => `(HProp.exists ([fun $b | ∃' $[$b']*, $Q]))
-  | `(∀' $b, $Q) => `(HProp.forall ([fun $b | $Q]))
-  | `(∀' $b $[$b']*, $Q) => `(HProp.forall ([fun $b | ∀' $[$b']*, $Q]))
+  | `(\∃ $b, $Q) => `(HProp.exists ([fun $b | $Q]))
+  | `(\∃ $b $[$b']*, $Q) => `(HProp.exists ([fun $b | \∃ $[$b']*, $Q]))
+  | `(\∀ $b, $Q) => `(HProp.forall ([fun $b | $Q]))
+  | `(\∀ $b $[$b']*, $Q) => `(HProp.forall ([fun $b | \∀ $[$b']*, $Q]))
 
 
 @[app_unexpander HProp.exists]
 def HProp.exists.unexpander : Lean.PrettyPrinter.Unexpander
   | `($_ fun $x:ident => $Q) =>
     match Q with
-    | `(∃' $y*, $Q') => `(∃' $x:ident $y*, $Q')
-    | _ => `(∃' $x:ident, $Q)
+    | `(\∃ $y*, $Q') => `(\∃ $x:ident $y*, $Q')
+    | _ => `(\∃ $x:ident, $Q)
   | _ => throw ()
 
 
@@ -116,8 +116,8 @@ def HProp.exists.unexpander : Lean.PrettyPrinter.Unexpander
 def HProp.forall.unexpander : Lean.PrettyPrinter.Unexpander
   | `($_ fun $x:ident => $Q) =>
     match Q with
-    | `(∀' $y*, $Q') => `(∀' $x:ident $y*, $Q')
-    | _ => `(∀' $x:ident, $Q)
+    | `(\∀ $y*, $Q') => `(\∀ $x:ident $y*, $Q')
+    | _ => `(\∀ $x:ident, $Q)
   | _ => throw ()
 
 
@@ -132,26 +132,26 @@ example (p: Loc) (v: Val) (H: HProp):
 := rfl
 
 example (H1: Nat → HProp):
-  (∃' n, H1 n) = HProp.exists fun n => H1 n
+  (\∃ n, H1 n) = HProp.exists fun n => H1 n
 := by
   rfl
 example (H1: Nat -> Nat → HProp):
-  ∃' n1 n2, H1 n1 n2 = ∃' n1, ∃' n2, H1 n1 n2
+  \∃ n1 n2, H1 n1 n2 = \∃ n1, \∃ n2, H1 n1 n2
 := by
   rfl
 example (H1: Nat → HProp) (H2: HProp):
-  ∃' n, (H1 n ** H2) = ∃' n, H1 n ** H2
+  \∃ n, (H1 n ** H2) = \∃ n, H1 n ** H2
 := rfl
 example (H1: Nat → HProp) (H2: HProp):
-  (∃' n, H1 n) ** H2 = (∃' n, H1 n).star H2
+  (\∃ n, H1 n) ** H2 = (\∃ n, H1 n).star H2
 := rfl
 
 
-def HProp.pure (P: Prop) : HProp := ∃' (_: P), emp
-def HProp.top : HProp := ∃' (H: HProp), H
-def HProp.wand (H1 H2: HProp): HProp := ∃' (H0: HProp), H0 ** HProp.pure ((H1 ** H0) ==> H2)
+def HProp.pure (P: Prop) : HProp := \∃ (_: P), \[]
+def HProp.top : HProp := \∃ (H: HProp), H
+def HProp.wand (H1 H2: HProp): HProp := \∃ (H0: HProp), H0 ** HProp.pure ((H1 ** H0) ==> H2)
 def HProp.qwand {α} (Q1 Q2: α → HProp): HProp :=
-  ∀' x, HProp.wand (Q1 x) (Q2 x)
+  \∀ x, HProp.wand (Q1 x) (Q2 x)
 
 @[simp]
 theorem HProp.pure.simp {P h}: HProp.pure P h ↔ P ∧ h = ∅ := by
@@ -163,8 +163,8 @@ theorem HProp.top.simp {h}: HProp.top h := by
   simp [HProp.top, HProp.exists]
   exists (fun h => True)
 
-notation:100 "pure[" P "]" => HProp.pure P
-notation "⊤" => HProp.top
+notation:100 "\\[" P "]" => HProp.pure P
+notation "\\Top" => HProp.top
 notation:60 Q:60 " *+ " H:61 => (fun x => (Q x) ** H)
 notation:57 H1:57 " -* " H2:57 => HProp.wand H1 H2
 notation:57 Q1:57 " --* " Q2:58 => HProp.qwand Q1 Q2
