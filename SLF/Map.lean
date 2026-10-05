@@ -489,8 +489,15 @@ theorem FMap.extensionality {α β: Type} {m1 m2: FMap α β} :
 
 @[simp, grind .]
 theorem FMap.congr {α β: Type} {m1 m2: FMap α β} :
-  m1 = m2 -> forall k, m1 k = m2 k
+  m1 = m2 → forall k, m1 k = m2 k
 := by
+  grind
+
+@[ext]
+theorem FMap.extensionality' {α β: Type} {m1 m2: FMap α β} (E: (∀ k, m1 k = m2 k)):
+  m1 = m2
+:= by
+  apply FMap.extensionality.mp
   grind
 
 @[simp, grind =]
@@ -1251,3 +1258,104 @@ theorem FMap.exists_nonempty {β} [Inhabited β]:
   replace H := FMap.congr H 0
   simp at H
   simp [Mappoid.single] at H
+
+/-!
+## The Heap Poset
+-/
+def FMap.le {α β} (f g: FMap α β) : Prop := forall x: α, f x ≠ none → g x = f x
+
+instance FMap.le_instance {α β}: LE (FMap α β) where
+  le := FMap.le
+
+@[app_unexpander FMap.le]
+def FMap.le_unexpander : Lean.PrettyPrinter.Unexpander
+  | `($_ $f $g) => `($f ≤ $g)
+  | _ => throw ()
+
+@[simp, refl, grind =]
+theorem FMap.le_refl {α β} (f: FMap α β) : f ≤ f := by
+  intros x hx
+  rfl
+
+@[simp, grind .]
+theorem FMap.le_trans {α β} {f g h: FMap α β} :
+ f ≤ g →
+  g ≤ h →
+  f ≤ h
+:= by
+  simp [LE.le, FMap.le]
+  grind
+
+@[grind .]
+theorem FMap.le_antisymm {α β} {f g: FMap α β} :
+  f ≤ g →
+  g ≤ f →
+  f = g
+:= by
+  intros Hfg Hgf
+  ext x
+  specialize Hfg x
+  specialize Hgf x
+  grind
+
+@[simp, grind =]
+theorem FMap.le_union {α β} {f g: FMap α β} :
+  f ≤ f ∪ g
+:= by
+  simp [LE.le, FMap.le, Mappoid.union, Union.union]
+  grind
+
+@[grind =_]
+theorem FMap.le_union_eq {α β} {f g: FMap α β} :
+  f ≤ g →
+  g = f ∪ g
+:= by
+  intro H
+  ext k m
+  specialize H k
+  simp [Union.union, Mappoid.union, Mappoid.find]
+  grind
+
+@[grind]
+def FMap.diff {α β} (g f: FMap α β) : FMap α β :=
+  ⟨fun x => if f x = none then g x else none, by
+    obtain ⟨f, lf, Hf⟩ := f
+    obtain ⟨g, lg, Hg⟩ := g
+    simp [Mappoid.find]
+    exists lf ++ lg
+    intro k
+    specialize Hf k
+    specialize Hg k
+    grind
+  ⟩
+
+@[simp, grind .]
+theorem FMap.diff_disjoint {α β} {f g: FMap α β} :
+  f ⊥ (FMap.diff g f)
+:= by
+  intro h
+  simp [FMap.diff, Mappoid.find]
+  grind
+
+@[simp, grind =]
+theorem FMap.diff_union {α β} {f g: FMap α β} :
+  f ∪ (FMap.diff g f) = f ∪ g
+:= by
+  apply FMap.extensionality.mp
+  intro k
+  simp_all
+  simp [Mappoid.union, Union.union]
+  simp [FMap.diff]
+  grind
+
+theorem FMap.le_split {α β} {f g: FMap α β} :
+  f ≤ g →
+  exists h: FMap α β, f ⊥ h ∧ g = f ∪ h
+:= by
+  intro H
+  exists (FMap.diff g f)
+  and_intros
+  . apply FMap.diff_disjoint
+  . simp
+    apply FMap.le_union_eq
+    exact H
