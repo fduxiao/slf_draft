@@ -7,18 +7,20 @@ open Map
 abbrev Heap := FMap Loc Val
 
 
+@[grind]
 def HProp := Heap → Prop
+@[grind]
 def HProp.Imp (H1 H2: HProp) : Prop := ∀ h, H1 h → H2 h
 
 scoped notation:45 H1:45 " ==> " H2:45 => HProp.Imp H1 H2
 
-@[refl]
-theorem HProp.Imp.refl {H: HProp}: H ==> H := by
+@[simp, refl, grind .]
+theorem HProp.imp_refl {H: HProp}: H ==> H := by
   intro h hH
   exact hH
 
 @[grind .]
-theorem HProp.Imp.trans {H1 H2 H3: HProp}:
+theorem HProp.imp_trans {H1 H2 H3: HProp}:
   H1 ==> H2 →
   H2 ==> H3 →
   H1 ==> H3
@@ -29,8 +31,10 @@ theorem HProp.Imp.trans {H1 H2 H3: HProp}:
   specialize h23 h
   apply h23 (h12 h1)
 
-@[grind .]
-theorem HProp.Imp.antisym {H1 H2: HProp}:
+instance: Trans HProp.Imp HProp.Imp HProp.Imp := ⟨HProp.imp_trans⟩
+
+@[grind ., ext]
+theorem HProp.imp_antisym {H1 H2: HProp}:
   H1 ==> H2 →
   H2 ==> H1 →
   H1 = H2
@@ -44,37 +48,47 @@ theorem HProp.Imp.antisym {H1 H2: HProp}:
   . exact h12
   . exact h21
 
-instance: Trans HProp.Imp HProp.Imp HProp.Imp := ⟨HProp.Imp.trans⟩
-
-
-theorem HProp.Imp.op_comm {op: HProp → HProp → HProp}:
+@[symm]
+theorem HProp.imp_op_comm {op: HProp → HProp → HProp}:
   (∀ H1 H2, op H1 H2 ==> op H2 H1) →
   ∀ H1 H2, op H1 H2 = op H2 H1
 := by
   intro A1 H1 H2
-  apply antisym
+  apply imp_antisym
   . apply A1
   . apply A1
 
+theorem HProp.imp_apply {H1 H2: HProp} {h}:
+  H1 h →
+  H1 ==> H2 →
+  H2 h
+:= by
+  intro h1 h12
+  exact h12 h h1
 
-def QImp {α} (Q1 Q2: α → HProp) : Prop := ∀ a, Q1 a ==> Q2 a
-scoped notation:45 Q1:45 " ===> " Q2:45 => QImp Q1 Q2
+@[grind]
+def HProp.QImp {α} (Q1 Q2: α → HProp) : Prop := ∀ a, Q1 a ==> Q2 a
+scoped notation:45 Q1:45 " ===> " Q2:45 => HProp.QImp Q1 Q2
 
-@[refl]
-theorem QImp.refl {α} {Q: α → HProp}:
+@[simp,refl, grind .]
+theorem HProp.Qimp_refl {α} {Q: α → HProp}:
   Q ===> Q
 := by
   intro a
   rfl
 
-
+@[grind]
 def HProp.empty : HProp := fun h => h = ∅
+@[grind]
 def HProp.single (p: Loc) (v: Val): HProp := fun h => h = Mappoid.single p v
+@[grind]
 def HProp.star (H1 H2: HProp): HProp :=
   fun h =>
     ∃ h1 h2, H1 h1 ∧ H2 h2 ∧ h1 ⊥ h2 ∧ h = h1 ∪ h2
+@[grind]
 def HProp.exists {α} (Q: α → HProp): HProp :=
   fun h => ∃ a, Q a h
+@[grind]
 def HProp.forall {α} (Q: α → HProp): HProp :=
   fun h => ∀ a, Q a h
 
@@ -94,6 +108,8 @@ macro_rules
   | `([fun _ : $t | $Q]) => `(fun _ : $t => $Q)
   | `([fun ($b: binder) | $Q]) => `([fun $b | $Q])
 
+notation "\\∃[" t "]" => HProp.exists t
+notation "\\∀[" t "]" => HProp.forall t
 scoped syntax:59 "\\∃ " binder+ ", " term:51: term
 scoped syntax:59 "\\∀ " binder+ ", " term:51: term
 macro_rules
@@ -147,24 +163,552 @@ example (H1: Nat → HProp) (H2: HProp):
 := rfl
 
 
+@[grind]
 def HProp.pure (P: Prop) : HProp := \∃ (_: P), \[]
+@[grind]
 def HProp.top : HProp := \∃ (H: HProp), H
-def HProp.wand (H1 H2: HProp): HProp := \∃ (H0: HProp), H0 ** HProp.pure ((H1 ** H0) ==> H2)
-def HProp.qwand {α} (Q1 Q2: α → HProp): HProp :=
-  \∀ x, HProp.wand (Q1 x) (Q2 x)
-
-@[simp]
+@[grind]
+def HProp.wand (H1 H2: HProp): HProp := \∃ H0, H0 ** HProp.pure ((H1 ** H0) ==> H2)
+@[grind]
+def HProp.qwand {α} (Q1 Q2: α → HProp): HProp := \∀ x, HProp.wand (Q1 x) (Q2 x)
+@[grind, simp]
+def HProp.qstar {α} (Q: α → HProp) (H: HProp): α → HProp := (fun x => (Q x) ** H)
+@[simp, grind =]
 theorem HProp.pure.simp {P h}: HProp.pure P h ↔ P ∧ h = ∅ := by
   simp [HProp.pure, HProp.exists, HProp.empty]
 
+notation "\\[" P "]" => HProp.pure P
+notation "\\Top" => HProp.top
+notation:60 Q:60 " *+ " H:61 => HProp.qstar Q H
+notation:57 H1:57 " -* " H2:57 => HProp.wand H1 H2
+notation:57 Q1:57 " -** " Q2:58 => HProp.qwand Q1 Q2
+
+/-!
+# Properties of `HProp`
+## Properties of `HProp.empty`
+-/
+@[simp, grind .]
+theorem HProp.empty_intro:
+  \[] ∅
+:= by
+  simp [HProp.empty]
+
+@[simp, grind .]
+theorem HProp.empty_elim {h}:
+  \[] h = (h = ∅)
+:= by
+  simp [HProp.empty]
+
+/-!
+## Properties of `HProp.star`
+-/
+@[simp, grind .]
+theorem HProp.star_intro {H1 H2: HProp} {h1 h2}:
+  H1 h1 →
+  H2 h2 →
+  h1 ⊥ h2 →
+  (H1 ** H2) (h1 ∪ h2)
+:= by
+  simp [HProp.star]
+  grind
+
+@[simp, grind .]
+theorem HProp.star_elim {H1 H2: HProp} {h}:
+  (H1 ** H2) h →
+  ∃ h1 h2, H1 h1 ∧ H2 h2 ∧ h1 ⊥ h2 ∧ h = h1 ∪ h2
+:= by
+  simp [HProp.star]
+
+@[simp, grind =]
+theorem HProp.star_assoc (H1 H2 H3: HProp):
+  (H1 ** H2) ** H3 = H1 ** (H2 ** H3)
+:= by
+  funext h
+  simp [HProp.star]
+  grind
+
+@[simp, symm, grind =]
+theorem HProp.star_comm (H1 H2: HProp):
+  H1 ** H2 = H2 ** H1
+:= by
+  funext h
+  simp [HProp.star]
+  grind
+
+@[simp, grind =]
+theorem HProp.star_empty_left (H: HProp):
+  \[] ** H = H
+:= by
+  funext h
+  simp [HProp.star, HProp.empty]
+  grind
+
+@[simp, grind =]
+theorem HProp.star_empty_right (H: HProp):
+  H ** \[] = H
+:= by
+  funext h
+  simp [HProp.star, HProp.empty]
+  grind
+
+@[simp, grind =]
+theorem HProp.star_exists {α} {J: α → HProp} {H: HProp}:
+  \∃[J] ** H = \∃ x, J x ** H
+:= by
+  funext h
+  simp [HProp.exists, HProp.star]
+  grind
+
+@[simp, grind .]
+theorem HProp.star_forall' {α} {J: α → HProp} {H: HProp}:
+  \∀[J] ** H ==> \∀[J *+ H]
+:= by
+  unfold HProp.star HProp.forall HProp.Imp HProp.qstar
+  grind
+
+@[simp, grind .]
+theorem HProp.imp_frame_left {H2 H1 H1': HProp}:
+  H1 ==> H1' →
+  H1 ** H2 ==> H1' ** H2
+:= by
+  unfold HProp.star HProp.Imp
+  grind
+
+@[simp, grind .]
+theorem HProp.imp_frame_right {H1 H2 H2': HProp}:
+  H2 ==> H2' →
+  H1 ** H2 ==> H1 ** H2'
+:= by
+  unfold HProp.star HProp.Imp
+  grind
+
+@[simp, grind .]
+theorem HProp.imp_frame_lr {H1 H1' H2 H2': HProp}:
+  H1 ==> H1' →
+  H2 ==> H2' →
+  H1 ** H2 ==> H1' ** H2'
+:= by
+  unfold HProp.star HProp.Imp
+  grind
+
+@[simp, grind .]
+theorem HProp.imp_star_trans_left {H1 H2 H3 H4: HProp}:
+  H1 ==> H2 →
+  H2 ** H3 ==> H4 →
+  H1 ** H3 ==> H4
+:= by
+  unfold HProp.star HProp.Imp
+  grind
+
+@[simp, grind .]
+theorem HProp.imp_star_trans_right {H1 H2 H3 H4: HProp}:
+  H1 ==> H2 →
+  H3 ** H2 ==> H4 →
+  H3 ** H1 ==> H4
+:= by
+  grind
+
+/-!
+## Properties of `HProp.pure`
+-/
+@[simp, grind .]
+theorem HProp.pure_intro {P}:
+  P → \[P] ∅
+:= by
+  simp [HProp.pure, HProp.exists]
+
+@[grind .]
+theorem HProp.pure_elim {P} {h}:
+  \[P] h → P ∧ h = ∅
+:= by
+  simp [HProp.pure, HProp.exists]
+
+@[simp, grind =]
+theorem HProp.star_pure_left {P} {H: HProp} {h}:
+  (\[P] ** H) h = (P ∧ H h)
+:= by
+  simp [HProp.star, HProp.pure, HProp.exists]
+  grind
+
+@[simp, grind =]
+theorem HProp.star_pure_right {P} {H: HProp} {h}:
+  (H ** \[P]) h = (H h ∧ P)
+:= by
+  simp [HProp.star, HProp.pure, HProp.exists]
+  grind
+
+@[simp, grind .]
+theorem HProp.imp_star_pure_right {P} {H H'}:
+  P →
+  (H ==> H') →
+  H ==> (\[P] ** H')
+:= by
+  simp [HProp.star, HProp.Imp, HProp.pure, HProp.exists]
+  grind
+
+@[simp, grind =]
+theorem HProp.pure_empty {P} h:
+ \[P] h = (P ∧ h = ∅)
+:= by
+  simp [HProp.pure, HProp.exists]
+
+@[simp, grind .]
+theorem HProp.imp_empty_pure {P}:
+  P → \[] ==> \[P]
+:= by
+  intro H h
+  grind
+
+@[simp, grind .]
+theorem HProp.imp_star_pure_left {P} {H H'}:
+  (\[P] ** H) ==> H' ↔
+  (P → (H ==> H'))
+:= by
+  simp [HProp.star, HProp.Imp, HProp.pure, HProp.exists]
+  grind
+
+@[simp, grind .]
+theorem HProp.imp_star_pure_left' {P} {H H'}:
+  (H ** \[P]) ==> H' ↔
+  (P → (H ==> H'))
+:= by
+  simp [HProp.star, HProp.Imp, HProp.pure, HProp.exists]
+  grind
+
+@[simp, grind =]
+theorem HProp.empty_eq_pure_true:
+  \[True] = \[]
+:= by
+  ext h <;> grind
+
+@[simp, grind =]
+theorem HProp.false_star_any {H}:
+  \[False] ** H = \[False]
+:= by
+  ext h <;> grind
+
+@[simp, grind =]
+theorem HProp.false_star_any' {H}:
+  H ** \[False] = \[False]
+:= by
+  grind
+
+/-!
+## Properties of `HProp.exists`
+-/
+
+theorem HProp.exists_intro {α} {x: α} {J: α → HProp} {h}:
+  J x h → \∃[J] h
+:= by
+  simp [HProp.exists]
+  grind
 
 @[simp]
+theorem HProp.exists_elim {α} {J: α → HProp} {h}:
+  \∃[J] h = ∃ x, J x h
+:= by
+  simp [HProp.exists]
+
+@[simp, grind .]
+theorem HProp.imp_exists_left {α} {J: α → HProp} {H: HProp}:
+  \∃[J] ==> H ↔ ∀ x, J x ==> H
+:= by
+  simp [HProp.exists, HProp.Imp]
+  grind
+
+@[simp]
+theorem HProp.imp_exists_right {α} {J: α → HProp} {H: HProp} {x}:
+  (H ==> J x) → H ==> \∃[J]
+:= by
+  simp [HProp.exists, HProp.Imp]
+  grind
+
+@[simp]
+theorem HProp.imp_exists {α} {J1 J2: α → HProp}:
+  J1 ===> J2 →
+  \∃[J1] ==> \∃[J2]
+:= by
+  simp [HProp.exists, HProp.Imp, HProp.QImp]
+  grind
+
+/-!
+## Properties of `HProp.forall`
+-/
+@[simp, grind =]
+theorem HProp.forall_spec {α} {J: α → HProp} {h}:
+  (\∀[J]) h ↔ ∀ x, J x h
+:= by
+  simp [HProp.forall]
+
+theorem HProp.forall_right {α} {J: α → HProp} {H: HProp}:
+  (∀ x, H ==> J x) ↔
+  H ==> \∀[J]
+:= by
+  simp [HProp.forall, HProp.Imp]
+  grind
+
+theorem HProp.forall_left {α} {J: α → HProp} {H: HProp} {x}:
+  J x ==> H →
+  \∀[J] ==> H
+:= by
+  simp [HProp.forall, HProp.Imp]
+  grind
+
+theorem HProp.forall_specialize {α} {J: α → HProp} {h} {x: α}:
+  (\∀[J]) h → J x h
+:= by
+  simp [HProp.forall]
+  grind
+
+theorem HProp.imp_forall {α} {J1 J2: α → HProp}:
+  J1 ===> J2 →
+  \∀[J1] ==> \∀[J2]
+:= by
+  simp [HProp.forall, HProp.Imp, HProp.QImp]
+  grind
+
+/-!
+## Properties of `HProp.wand`
+-/
+@[simp, grind =]
+theorem HProp.wand_eval {H1 H2: HProp} {h}:
+  (H1 -* H2) h = ∃ H0, H0 h ∧ H0 ** H1 ==> H2
+:= by
+  simp [HProp.wand]
+
+@[simp, grind =]
+theorem HProp.wand_equiv {H0 H1 H2: HProp}:
+  (H0 ==> H1 -* H2) ↔ (H0 ** H1 ==> H2)
+:= by
+  apply Iff.intro
+  . rintro H h ⟨h1, h2, H0h1, H1h2, HD, E⟩
+    obtain ⟨H', K⟩ := H h1 H0h1
+    simp_all
+    obtain ⟨K1, K2⟩ := K
+    apply K2
+    exists h2, h1
+    simp_all
+    grind
+  . rintro H h H0h
+    simp [HProp.wand, HProp.exists]
+    exists H0
+    simp_all
+
+@[simp, grind .]
+theorem HProp.wand_cancel {H1 H2: HProp}:
+  H1 ** (H1 -* H2) ==> H2
+:= by
+  intro h H
+  obtain ⟨h1, h2, H1h1, H12h2, HD, E⟩ := H
+  simp at H12h2
+  obtain ⟨H0, H0h2, I⟩ := H12h2
+  apply I
+  exists h1, h2
+
+
+@[simp, grind .]
+theorem HProp.imp_empty_wand_same {H: HProp}:
+  \[] ==> (H -* H)
+:= by
+  intro h K
+  simp_all
+  exists \[]
+  simp
+
+@[simp, grind =]
+theorem HProp.wand_empty_left {H: HProp}:
+  (\[] -* H) = H
+:= by
+  ext h K
+  . simp at K
+    obtain ⟨H0, H0h, I⟩ := K
+    apply I
+    exact H0h
+  . simp
+    exists H
+
+@[simp, grind =]
+theorem HProp.wand_pure_left {P H}:
+  P → (\[P] -* H) = H
+:= by
+  grind
+
+@[simp, grind =]
+theorem HProp.wand_curry_eq {H1 H2 H3: HProp}:
+  (H1 ** H2) -* H3 = H1 -* (H2 -* H3)
+:= by
+  ext h K
+  . simp at K
+    obtain ⟨H0, H0h, E⟩ := K
+    simp
+    exists H0
+    simp_all
+    grind
+  . grind
+
+@[grind .]
+theorem HProp.wand_inv {H1 H2 h1 h2}:
+  (H1 -* H2) h2 →
+  H1 h1 →
+  h1 ⊥ h2 →
+  H2 (h1 ∪ h2)
+:= by
+  intro H12 h1h HD
+  simp at H12
+  obtain ⟨H0, H0h2, I⟩ := H12
+  apply I
+  grind
+
+/-!
+## Properties of `HProp.qwand`
+-/
+@[simp, grind=]
+theorem HProp.qwand_eval {α} {Q1 Q2: α → HProp} {h}:
+  (Q1 -** Q2) h = (\∀ x, Q1 x -* Q2 x) h
+:= by
+  simp [HProp.qwand]
+
+@[simp, grind =]
+theorem HProp.qwand_eq {α} {Q1 Q2: α → HProp} {H: HProp}:
+   H ==> (Q1 -** Q2) ↔ (Q1 *+ H) ===> Q2
+:= by
+  apply Iff.intro
+  . intro K a
+    simp
+    rintro h ⟨h1, h2, Hh1, Q1ah2, HD, E⟩
+    specialize K h1 Hh1 a
+    simp at K
+    obtain ⟨H0, H0h1, I⟩ := K
+    apply I
+    exists h1, h2
+  . intro K h Hh a
+    specialize K a
+    simp_all
+    exists H
+
+@[simp, grind .]
+theorem HProp.qwand_cancel {α} {Q1 Q2: α → HProp}:
+  Q1 *+ (Q1 -** Q2) ===> Q2
+:= by
+  rewrite [<-HProp.qwand_eq]
+  simp
+
+theorem HProp.qwand_specialize {α} {Q1 Q2: α → HProp} {x}:
+  (Q1 -** Q2) ==> (Q1 x -* Q2 x)
+:= by
+  intro h K
+  specialize K x
+  exact K
+
+/-!
+## Properties of `HProp.HTop`
+-/
+@[simp, grind .]
 theorem HProp.top.simp {h}: HProp.top h := by
   simp [HProp.top, HProp.exists]
   exists (fun h => True)
 
-notation:100 "\\[" P "]" => HProp.pure P
-notation "\\Top" => HProp.top
-notation:60 Q:60 " *+ " H:61 => (fun x => (Q x) ** H)
-notation:57 H1:57 " -* " H2:57 => HProp.wand H1 H2
-notation:57 Q1:57 " --* " Q2:58 => HProp.qwand Q1 Q2
+@[simp, grind .]
+theorem HProp.top_terminal {H: HProp}:
+  H ==> HProp.top
+:= by
+  intro h K
+  simp
+
+@[simp, grind =]
+theorem HProp.exists_self_top:
+  \∃ H, H = \Top
+:= by
+  simp [HProp.top]
+
+@[simp, grind =]
+theorem HProp.star_top_top:
+  \Top ** \Top = \Top
+:= by
+  ext h K
+  . grind
+  . simp [HProp.star]
+    exists h, ∅
+    simp
+
+
+/-!
+## Properties of `HProp.single`
+-/
+@[simp, grind .]
+theorem HProp.single_intro {p v}:
+  (p ~~> v) ∅[p => v]
+:= by
+  simp [HProp.single]
+
+@[simp, grind =]
+theorem HProp.single_eval {p v} {h}:
+  (p ~~> v) h = (h = ∅[p => v])
+:= by
+  simp [HProp.single]
+
+@[simp, grind =]
+theorem HProp.star_single_same_location {p w1 w2}:
+  (p ~~> w1) ** (p ~~> w2) = \[False]
+:= by
+  ext h K
+  . grind
+  . grind
+
+
+def HProp.affine (_: HProp) := True
+
+@[simp, grind .]
+theorem HProp.affine_any {H: HProp}:
+  affine H
+:= by
+  simp [HProp.affine]
+
+@[simp, grind .]
+theorem HProp.affine_empty:
+  HProp.affine \[] :=
+by
+  simp [HProp.affine]
+
+@[grind]
+def HProp.gc := HProp.top /- equivalent to \∃ H, \[affine H] ** H -/
+
+@[simp, grind =]
+theorem HProp.equiv:
+  HProp.gc = \Top
+:= by
+  simp [HProp.gc]
+
+notation "\\GC" => (HProp.gc)
+
+@[simp, grind =]
+theorem HProp.gc_simp:
+  \GC = \Top
+:= by
+  simp [HProp.gc]
+
+@[simp, grind =]
+theorem HProp.gc_eq_exists:
+  \∃ H, \[affine H] ** H = \GC
+:= by
+  simp [HProp.gc]
+
+@[simp, grind .]
+theorem HProp.affine_gc :
+  HProp.affine \GC
+:= by
+  simp [HProp.affine]
+
+@[simp, grind .]
+theorem HProp.imp_gc_r {H: HProp}:
+  H.affine →
+  H ==> \GC
+:= by
+  intro h K
+  simp [HProp.gc]
+
+@[simp, grind =]
+theorem HProp.star_gc_gc:
+  \GC ** \GC = \GC
+:= by
+  simp [HProp.gc]

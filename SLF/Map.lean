@@ -14,6 +14,7 @@ A class that defines the basic operations for a map-like structure.
 -/
 
 /-- A class that defines the basic operations for a map-like structure.. -/
+@[grind]
 class Mappoid (M: Type -> Type -> Type) where
   find {α β}: M α β → α → Option β
   empty {α β}: M α β
@@ -43,6 +44,7 @@ instance {α β M} [inst: Mappoid M]: GetElem? (M α β) α β (fun m k => k ∈
 instance {α β M} [inst: Mappoid M]: Union (M α β) where
   union := inst.union
 
+@[grind]
 def Mappoid.update {α β M} [inst: Mappoid M] [DecidableEq α] (m: M α β) (k: α) (v: β): M α β
   := inst.union (inst.single k v) m
 
@@ -75,18 +77,19 @@ instance {α β M} [Mappoid M] {m: M α β} {k: α}: Decidable (k ∈ m) := by
 /-!
 ### other properties of `Mappoid`
 -/
-
+@[grind]
 def Mappoid.disjoint {α β M} [Mappoid M] (m1 m2: M α β) :=
   ∀ (k: α), m1 k = none ∨ m2 k = none
 
 scoped notation:50 m1:50 " ⊥ " m2:51 => Mappoid.disjoint m1 m2
 
+@[grind]
 def Mappoid.disjoint3 {α β M} [Mappoid M] (m1 m2 m3: M α β) :=
   m1 ⊥ m2 ∧ m2 ⊥ m3 ∧ m3 ⊥ m1
 
 scoped notation:51 m1:52 " ⊥ " m2:52 " ⊥ " m3:52 => Mappoid.disjoint3 m1 m2 m3
 
-
+@[grind]
 def Mappoid.agree {α β M} [Mappoid M] (m1 m2: M α β) :=
   ∀ (k: α) (v1 v2: β), m1 k = some v1 → m2 k = some v2 → v1 = v2
 
@@ -160,7 +163,7 @@ theorem Mappoid.disjoint_symm {α β M} [Mappoid M] {m1 m2: M α β} :
   . left
     assumption
 
-
+@[grind]
 def Mappoid.eq {α β M} [Mappoid M] (m1 m2: M α β) :=
   ∀ (k: α), m1 k = m2 k
 
@@ -198,6 +201,7 @@ class DisjointComm (M: Type -> Type -> Type) extends Mappoid M where
 ## Implementation of `Map`
 -/
 
+@[grind]
 def Map (α β: Type): Type := α → Option β
 
 
@@ -287,6 +291,7 @@ We then add the `finite` property to the `Map` type,
 and prove several necessary properties about `finite` maps to make the `FMap` type.
 -/
 
+@[grind]
 def Map.finite {α β: Type} (m: Map α β) :=
   ∃ (l: List α), ∀ (k: α), m k = none ∨ k ∈ l
 
@@ -410,6 +415,7 @@ theorem Map.update_single_eq {α β} [DecidableEq α] {k: α} {v: β}:
 /-!
 ## Implementation of `FMap`
 -/
+@[grind]
 def FMap (α β: Type): Type := { m: Map α β // m.finite }
 
 instance: Mappoid FMap where
@@ -1102,7 +1108,7 @@ theorem FMap.fmap_eq_demo {α β} [DecidableEq α] {m1 m2 m3 m4 m5: FMap α β}:
 ### Existence of Fresh Locations
 #### New location in a list
 -/
-
+@[grind]
 def FMap.newLoc (l: List Nat): Nat := 1 + l.foldr (· + ·) 0
 
 theorem FMap.newLoc_le {l: List Nat} {n: Nat}:
@@ -1153,7 +1159,7 @@ theorem FMap.single_refresh {β} {null} {m: FMap Nat β} {v}:
 /-!
 #### Consecutive locations in a `FMap`
 -/
-@[simp, grind =]
+@[simp, grind]
 def FMap.conseq {β} (vs: List β) (start: Nat): FMap Nat β :=
   match vs with
   | [] => ∅
@@ -1192,6 +1198,7 @@ theorem FMap.disjoint_single_conseq {β} {x y: Nat} {v} {vs: List β}:
 := by
   grind
 
+@[grind]
 def FMap.fresh {β} (null: Nat) (m: FMap Nat β) (x: Nat): Prop :=
   x ∉ m ∧ x ≠ null
 
@@ -1216,6 +1223,7 @@ instance FMap.fresh_decidable {β} {null: Nat} {m: FMap Nat β} {x: Nat}:
       apply isTrue
       trivial
 
+@[grind]
 def FMap.smallest_fresh {β} (null: Nat) (m: FMap Nat β) (x: Nat): Prop :=
   FMap.fresh null m x ∧ ∀ y, y < x → ¬ FMap.fresh null m y
 
@@ -1262,6 +1270,7 @@ theorem FMap.exists_nonempty {β} [Inhabited β]:
 /-!
 ## The Heap Poset
 -/
+@[grind]
 def FMap.le {α β} (f g: FMap α β) : Prop := forall x: α, f x ≠ none → g x = f x
 
 instance FMap.le_instance {α β}: LE (FMap α β) where
