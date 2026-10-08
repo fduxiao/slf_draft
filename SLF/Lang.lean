@@ -1,4 +1,5 @@
 import Lean
+import SLF.Helpers
 import SLF.Map
 
 
@@ -382,7 +383,7 @@ example: [slf| x +> 3 == y] =
 -/
 
 section
-open Lean Elab Command Term PrettyPrinter Delaborator
+open Lean PrettyPrinter
 
 @[app_unexpander Val.int]
 def unexpandValInt: Unexpander
@@ -662,15 +663,10 @@ def unexpandLet: Unexpander
     | `(slf_term| $v ) => `([slf| let $name := $v in $b ])
   | _ => throw ()
 
-scoped elab "slf_pp" stx:term:51: term => do
-  let expr ← elabTerm stx none
-  let pretty ← ppExpr expr
-  let str := toString pretty
-  pure <| toExpr str
-
 end
 
 namespace TestPrettyPrinter
+open SLF.PP
 
 /--
 Evaluate the pretty printer on a term. Since I am going to compare the result using `=`,
