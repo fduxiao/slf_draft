@@ -6,6 +6,7 @@ import SLF.Map
 namespace SLF.Lang
 open Map
 
+section Definition
 /-!
 ## Definition of the language
 -/
@@ -39,6 +40,7 @@ def Loc.toNat (l: Loc): Nat := l
 @[simp]
 def Loc.toInt (l: Loc): Int := Int.ofNat l
 
+section Instances
 
 instance: Coe Nat Loc where
   coe x := x
@@ -51,6 +53,8 @@ instance: HAdd Loc Int Loc where
 
 def null: Loc := 0
 abbrev Var: Type := String
+
+end Instances
 
 mutual
 
@@ -80,7 +84,7 @@ inductive Term : Type where
 
 end
 
-
+section Instances
 instance: Coe Prim Val where
   coe := Val.prim
 
@@ -112,10 +116,13 @@ instance {n}: OfNat Term n where
 
 def Term.loc (l: Loc): Term := Term.val (Val.loc l)
 
+end Instances
+end Definition
+section Syntax
 /-!
 ## Custom syntax for the language
 -/
-
+section Definition
 declare_syntax_cat slf_term (behavior := symbol)
 scoped syntax "[slf| " slf_term " ]" : term
 scoped syntax " [" term "] " : slf_term
@@ -171,8 +178,9 @@ scoped syntax:40 slf_term:40 " <= " slf_term:41 : slf_term
 scoped syntax:40 slf_term:40 " < " slf_term:41 : slf_term
 scoped syntax:40 slf_term:40 " >= " slf_term:41 : slf_term
 scoped syntax:40 slf_term:40 " > " slf_term:41 : slf_term
+end Definition
 
-
+section Macros
 scoped macro_rules
 | `([slf| [$t] ]) => `((($t): Term))
 | `([slf| ( $t ) ]) => `([slf| $t ])
@@ -217,7 +225,9 @@ scoped macro_rules
 | `([slf| $t1 < $t2 ]) => `(Term.app (Term.app Prim.lt [slf| $t1 ]) [slf| $t2 ])
 | `([slf| $t1 >= $t2 ]) => `(Term.app (Term.app Prim.ge [slf| $t1 ]) [slf| $t2 ])
 | `([slf| $t1 > $t2 ]) => `(Term.app (Term.app Prim.gt [slf| $t1 ]) [slf| $t2 ])
+end Macros
 
+section Examples
 example: [slf| p.a] = Term.var "p.a" := rfl
 example: [slf| !p] = Term.app Prim.get (Term.var "p") := rfl
 example: [slf| !["x"]] = Term.app Prim.get (Term.var "x") := rfl
@@ -377,12 +387,15 @@ example: [slf| x +> 3 == y] =
   Term.app (.app Prim.eq (.app (.app Prim.ptr_add "x") 3)) "y"
 := rfl
 
+end Examples
+end Syntax
+
 
 /-!
 ## Pretty printing of the language
 -/
 
-section
+section PrettyPrinting
 open Lean PrettyPrinter
 
 @[app_unexpander Val.int]
@@ -663,7 +676,7 @@ def unexpandLet: Unexpander
     | `(slf_term| $v ) => `([slf| let $name := $v in $b ])
   | _ => throw ()
 
-end
+end PrettyPrinting
 
 namespace TestPrettyPrinter
 open SLF.PP

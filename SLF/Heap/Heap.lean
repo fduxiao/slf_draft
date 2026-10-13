@@ -6,9 +6,11 @@ open Map
 
 abbrev Heap := FMap Loc Val
 
-
 @[grind]
 def HProp := Heap → Prop
+
+section Imp
+
 @[grind]
 def HProp.Imp (H1 H2: HProp) : Prop := ∀ h, H1 h → H2 h
 
@@ -68,6 +70,9 @@ theorem HProp.imp_apply {H1 H2: HProp} {h}:
   intro h1 h12
   exact h12 h h1
 
+end Imp
+
+section QImp
 @[grind]
 def HProp.QImp {α} (Q1 Q2: α → HProp) : Prop := ∀ a, Q1 a ==> Q2 a
 scoped notation:45 Q1:45 " ===> " Q2:45 => HProp.QImp Q1 Q2
@@ -78,7 +83,9 @@ theorem HProp.qimp_refl {α} {Q: α → HProp}:
 := by
   intro a
   rfl
+end QImp
 
+section HPropOp
 @[grind]
 def HProp.empty : HProp := fun h => h = ∅
 @[grind]
@@ -138,7 +145,7 @@ def HProp.forall.unexpander : Lean.PrettyPrinter.Unexpander
     | _ => `(\∀ $x:ident, $Q)
   | _ => throw ()
 
-
+section Examples
 example (H1 H2 H3: HProp): H1 ** H2 ** H3 = H1 ** (H2 ** H3) := rfl
 example (H1 H2 H3: HProp): (H1 ** H2) ** H3 = (H1 ** H2) ** H3 := rfl
 example (p: Loc) (v: Val): p ~~> v = HProp.single p v := rfl
@@ -163,7 +170,7 @@ example (H1: Nat → HProp) (H2: HProp):
 example (H1: Nat → HProp) (H2: HProp):
   (\∃ n, H1 n) ** H2 = (\∃ n, H1 n).star H2
 := rfl
-
+end Examples
 
 @[grind]
 def HProp.pure (P: Prop) : HProp := \∃ (_: P), \[]
@@ -185,8 +192,14 @@ notation:60 Q:60 " *+ " H:61 => HProp.qstar Q H
 notation:57 H1:57 " -* " H2:57 => HProp.wand H1 H2
 notation:57 Q1:57 " -** " Q2:58 => HProp.qwand Q1 Q2
 
+end HPropOp
+
+section HPropProperties
 /-!
 # Properties of `HProp`
+-/
+section Empty
+/-!
 ## Properties of `HProp.empty`
 -/
 @[simp, grind .]
@@ -201,6 +214,8 @@ theorem HProp.empty_elim {h}:
 := by
   simp [HProp.empty]
 
+end Empty
+section Star
 /-!
 ## Properties of `HProp.star`
 -/
@@ -330,6 +345,8 @@ theorem HProp.imp_star_trans_right {H1 H2 H3 H4: HProp}:
 := by
   grind
 
+end Star
+section Pure
 /-!
 ## Properties of `HProp.pure`
 -/
@@ -414,7 +431,9 @@ theorem HProp.false_star_any' {H}:
   H ** \[False] = \[False]
 := by
   grind
+end Pure
 
+section Exists
 /-!
 ## Properties of `HProp.exists`
 -/
@@ -453,6 +472,8 @@ theorem HProp.imp_exists {α} {J1 J2: α → HProp}:
   simp [HProp.exists, HProp.Imp, HProp.QImp]
   grind
 
+end Exists
+section Forall
 /-!
 ## Properties of `HProp.forall`
 -/
@@ -489,6 +510,8 @@ theorem HProp.imp_forall {α} {J1 J2: α → HProp}:
   simp [HProp.forall, HProp.Imp, HProp.QImp]
   grind
 
+end Forall
+section Wand
 /-!
 ## Properties of `HProp.wand`
 -/
@@ -617,6 +640,8 @@ theorem HProp.wand_inv {H1 H2 h1 h2}:
   apply I
   grind
 
+end Wand
+section QWand
 /-!
 ## Properties of `HProp.qwand`
 -/
@@ -658,6 +683,8 @@ theorem HProp.qwand_specialize {α} {Q1 Q2: α → HProp} {x}:
   specialize K x
   exact K
 
+end QWand
+section HTop
 /-!
 ## Properties of `HProp.HTop`
 -/
@@ -689,6 +716,8 @@ theorem HProp.star_top_top:
     exists h, ∅
     simp
 
+end HTop
+section Single
 
 /-!
 ## Properties of `HProp.single`
@@ -713,6 +742,9 @@ theorem HProp.star_single_same_location {p w1 w2}:
   . grind
   . grind
 
+end Single
+
+section Affine
 
 def HProp.affine (_: HProp) := True
 
@@ -727,6 +759,8 @@ theorem HProp.affine_empty:
   HProp.affine \[] :=
 by
   simp [HProp.affine]
+
+section GC
 
 @[grind]
 def HProp.gc := HProp.top /- equivalent to \∃ H, \[affine H] ** H -/
@@ -744,6 +778,7 @@ theorem HProp.gc_simp:
   \GC = \Top
 := by
   simp [HProp.gc]
+end GC
 
 @[simp, grind =]
 theorem HProp.gc_eq_exists:
@@ -770,3 +805,5 @@ theorem HProp.star_gc_gc:
   \GC ** \GC = \GC
 := by
   simp [HProp.gc]
+end Affine
+end HPropProperties

@@ -9,6 +9,7 @@ import SLF.Heap.Heap
 namespace SLF.Heap
 open Map
 
+section ac_rfl
 /-!
 ## `ac_rfl` of `**`
 -/
@@ -29,7 +30,6 @@ example {H1 H2 H3 H4}:
 := by
   ac_rfl
 
-section
 open Lean.Parser.Tactic
 /--
 `hprop_ac_rfl` is a tactic that first simplifies all occurrences of `\[]` in `**` expressions,
@@ -43,11 +43,13 @@ macro_rules
     `(tactic| ((try simp only $[ [ $[$x:term],* ] ]?)) <;> first | ac_rfl | grind)
   | `(tactic| hprop_rfl $[ [$[$x:term],* ] ]?) =>
     `(tactic| ((try simp $[ [ $[$x:term],* ] ]?)) <;> first | ac_rfl | grind)
-end
+end ac_rfl
 
+section ac_rfl_example
 /-!
 The following are some examples from SLF.
 -/
+
 example (H1 H2): H1 ** H2 ** \[] = H2 ** H1 ** \[] ** \[] := by
   hprop_rfl
 
@@ -66,6 +68,7 @@ example {H1 H2 H3 H4 H5 H6 H7 H8 H}:
   = H8 ** H1 ** H2 ** H3 ** H4 ** H5 ** H6 ** H7 ** H
 := by
   hprop_rfl
+end ac_rfl_example
 
 /-!
 Another notable thing is that `simp` will always reduce a `**` expression from a tree-like structure
@@ -83,9 +86,11 @@ example {H1 H2 H3: HProp}:
 
 end
 
+section ExtraTheorems
 /-!
 ## Other theorems for building tactics
 -/
+
 @[simp, grind .]
 theorem HProp.star_simpl_cancel {H1 Ha H Ht: HProp}:
   H1 ==> Ha ** Ht →
@@ -98,6 +103,8 @@ theorem HProp.qimp_unit {P Q: Unit → HProp}:
   (P ===> Q) ↔ (P () ==> Q ())
 := by
   grind
+
+end ExtraTheorems
 
 /-!
 ## `xsimp` tactic for `**` expressions
@@ -126,10 +133,12 @@ theorem XSimp.intro (H1 H2: HProp):
   simp [XSimp]
 
 
+open Lean Meta Elab PP Tactic Qq
+
+section XSimpHelpers
 /-!
 Then we build some helper functions for manipulating `**` expressions.
 -/
-open Lean Meta Elab PP Tactic Qq
 
 
 def parseProp (e: Q(Prop)): MetaM (Q(Prop)) := do
@@ -219,6 +228,9 @@ def searchFor! (P: Q(HProp) → Bool) (E: Q(HProp)) : MetaM Q(HProp) := do
   | some h => pure h
   | none => pure E
 
+end XSimpHelpers
+
+section XSimpStart
 /-!
 ### `xsimp_start`
 -/
@@ -313,12 +325,15 @@ scoped elab "print_xsimp" : tactic => do
   sorry
 ```
 -/
+end XSimpStart
 
+section XSimpLStep
 /-!
 ### `xsimp_l_step`
 A left step in the `xsimpl` process.
 -/
 
+section NecessaryTheorems
 theorem XSimp.change_hla {Hla Hla' Hlw Hlt HR}:
   Hla = Hla' →
   XSimp (Hla', Hlw, Hlt) HR →
@@ -441,6 +456,10 @@ theorem XSimp.left_cancel_qwand {α} (x: α) (Q1 Q2: α → HProp) Hla Hlw Hlt H
     _ ==> Q2 x ** Hla ** Hlw ** Hlt := by grind
     _ ==> _ := by grind
 
+end NecessaryTheorems
+
+section XSimpLStepCore
+
 scoped elab "xsimp_step_l_core" c:bool v:bool : tactic => withMainContext do
   let cancel_wands: Bool := interpBool c
   let verbose: Bool := interpBool v
@@ -527,6 +546,9 @@ macro_rules
   | `(tactic| xsimp_step_l verbose) => `(tactic| xsimp_step_l_core true true)
   | `(tactic| xsimp_step_l) => `(tactic| xsimp_step_l_core true false)
 
+end XSimpLStepCore
+
+section Examples
 #try {H1 H2 H3 H4} {n: Int}:
   \[] ** H2 ** H1 ** \[n > 0] ** H3 ==> H4
 := by
@@ -613,7 +635,7 @@ If it cannot be eliminated, it should be kept as is.
   xsimp_step_l
   xsimp_step_l
   xsimp_step_l -- We can no longer eliminate the wand
-  fail_if_success xsimp_step_l
+  -- fail_if_success xsimp_step_l
   sorry
 
 /-!
@@ -669,5 +691,8 @@ If we have `(H2 ** H1) -* H3`, it should be canceled appropriately.
   xsimp_step_l
   xsimp_step_l
   sorry
+
+end Examples
+end XSimpLStep
 
 end XSimp

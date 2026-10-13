@@ -4,7 +4,7 @@ import SLF.Heap
 namespace SLF.Lang
 open Map Heap
 
-
+section Substitution
 def Term.isValue : Term → Bool
   | Term.val _ => true
   | _ => false
@@ -22,6 +22,8 @@ def Term.subst (y: Var) (v: Val) (t: Term): Term :=
   | .let x t1 t2 => .let x (Term.subst y v t1) (if x = y then t2 else (Term.subst y v t2))
   | .if t0 t1 t2 => .if (Term.subst y v t0) (Term.subst y v t1) (Term.subst y v t2)
 
+end Substitution
+section SmallStep
 
 /-!
 ## Small-step semantics of the language
@@ -153,6 +155,8 @@ def Term.reducible (s: Heap) (t: Term): Prop :=
 def Term.nonstuck (s: Heap) (t: Term): Prop :=
   t.isValue ∨ Term.reducible s t
 
+end SmallStep
+section OmniBigStep
 
 /-!
 ## Omni-Big-step semantics of the language
@@ -198,7 +202,9 @@ inductive EvalBinOp : Prim → Val → Val → (Val → Prop) → Prop where
   | ptr_add {p1 p2: Loc} {n: Int}:
       p2.toInt = (p1 + n).toInt →
       EvalBinOp .ptr_add p1 n (· = p2)
+end OmniBigStep
 
+section PurePost
 /--
 `PurePost s P` converts a predicate `P: Val → Prop` into
 a postcondition of type `Val → Heap → Prop` that holds in the state `s`.
@@ -210,6 +216,9 @@ equivalent to `PurePost s P ===> Q`
 -/
 def PurePostIn (s: Heap) (P: Val → Prop) (Q: Val → Heap → Prop): Prop := ∀ v, P v → Q v s
 
+end PurePost
+
+section Eval
 
 inductive Eval : Heap → Term → (Val → Heap → Prop) → Prop where
   | val {s} {v} {Q}:
@@ -415,3 +424,5 @@ theorem Term.eval_like.refl {t}:
   Term.eval_like t t
 := by
   simp [Term.eval_like]
+
+end Eval

@@ -7,7 +7,7 @@ The `Map` is implemented as a function from `α` to `Option β`.
 The `FMap` is a subtype of `Map` that is finite.
 -/
 
-
+section Mappoid
 /-!
 ## Mappoid
 A class that defines the basic operations for a map-like structure.
@@ -73,10 +73,13 @@ instance {α β M} [Mappoid M] {m: M α β} {k: α}: Decidable (k ∈ m) := by
   . apply isTrue
     intro H
     contradiction
+end Mappoid
 
+section MappoidProperties
 /-!
 ### other properties of `Mappoid`
 -/
+
 @[grind]
 def Mappoid.disjoint {α β M} [Mappoid M] (m1 m2: M α β) :=
   ∀ (k: α), m1 k = none ∨ m2 k = none
@@ -196,7 +199,9 @@ class DisjointComm (M: Type -> Type -> Type) extends Mappoid M where
     m1 ⊥ m2 →
     m1 ∪ m2 ≈ m2 ∪ m1
 
+end MappoidProperties
 
+section Map
 /-!
 ## Implementation of `Map`
 -/
@@ -290,6 +295,7 @@ example {A B: Prop}:
 We then add the `finite` property to the `Map` type,
 and prove several necessary properties about `finite` maps to make the `FMap` type.
 -/
+section MapFinite
 
 @[grind]
 def Map.finite {α β: Type} (m: Map α β) :=
@@ -347,8 +353,9 @@ theorem Map.filter_finite {α β: Type} {p: α → β → Bool} {m: Map α β} :
   intro k
   simp [Mappoid.filter]
   grind
+end MapFinite
 
-
+section MapSimp
 @[simp, grind =]
 theorem Map.find_eq {α β: Type} (m: Map α β) (k: α):
   Mappoid.find m k = m k
@@ -412,6 +419,10 @@ theorem Map.update_single_eq {α β} [DecidableEq α] {k: α} {v: β}:
   funext
   grind
 
+end MapSimp
+end Map
+
+section FMap
 /-!
 ## Implementation of `FMap`
 -/
@@ -430,6 +441,7 @@ instance: Mappoid FMap where
   filter := fun p m =>
     ⟨Mappoid.filter p m.val, Map.filter_finite m.property⟩
 
+section FMapProperties
 
 /-!
 ### Properties of `FMap`
@@ -572,6 +584,7 @@ theorem FMap.remove_val {α β: Type} [DecidableEq α] {m: FMap α β} {k: α} :
   funext k
   simp [Mappoid.remove]
 
+section Domain
 /-!
 #### Domain
 -/
@@ -641,6 +654,9 @@ theorem FMap.disjoint_single_of_not_indom {α β} [DecidableEq α] {m: FMap α �
 := by
   grind
 
+end Domain
+
+section Disjointness
 /-!
 #### Disjointness
 -/
@@ -716,6 +732,9 @@ theorem FMap.disjoin_remove_left {α β} [DecidableEq α] {m1 m2: FMap α β} {x
 := by
   grind
 
+end Disjointness
+
+section Union
 /-!
 #### Union
 -/
@@ -797,6 +816,10 @@ theorem FMap.union_eq_inv_of_disjoint {α β} [DecidableEq α] {m1 m1' m2: FMap 
   replace H3 := congrFun H3 k
   simp_all [Mappoid.union, Union.union, Mappoid.find, Mappoid.disjoint]
   grind
+
+end Union
+
+section Compatibility
 
 /-!
 #### Compatibility
@@ -896,7 +919,9 @@ theorem FMap.agree_union_r_inv {α β} [DecidableEq α] {m1 m2 m3: FMap α β}:
 := by
   grind
 
+end Compatibility
 
+section Read
 /-!
 #### Read
 -/
@@ -946,6 +971,8 @@ theorem FMap.read_union_right {α β} [DecidableEq α] [Inhabited β] {m1 m2: FM
   apply Map.read_union_right
   simp_all [Membership.mem, Mappoid.find]
 
+end Read
+section Update
 /-!
 #### Update
 -/
@@ -1012,6 +1039,10 @@ theorem FMap.update_union_not_right {α β} [DecidableEq α] {m1 m2: FMap α β}
   simp_all [Mappoid.update, Union.union, Mappoid.union, Mappoid.single, Membership.mem, Mappoid.find]
   grind
 
+end Update
+
+section Removal
+
 /-!
 #### Removal
 -/
@@ -1062,6 +1093,10 @@ theorem FMap.remove_update_left {α β} [DecidableEq α] {m: FMap α β} {k: α}
 := by
   exact FMap.remove_union_single_left
 
+end Removal
+end FMapProperties
+
+section Tactics
 /-!
 #### Tactics
 -/
@@ -1116,6 +1151,11 @@ theorem FMap.fmap_eq_demo {α β} [DecidableEq α] {m1 m2 m3 m4 m5: FMap α β}:
 := by
   fmap
 
+end Tactics
+end FMap
+
+section FreshLocations
+
 /-!
 ### Existence of Fresh Locations
 #### New location in a list
@@ -1168,6 +1208,7 @@ theorem FMap.single_refresh {β} {null} {m: FMap Nat β} {v}:
   exists x
   grind
 
+section ConsecutiveLocations
 /-!
 #### Consecutive locations in a `FMap`
 -/
@@ -1279,6 +1320,10 @@ theorem FMap.exists_nonempty {β} [Inhabited β]:
   simp at H
   simp [Mappoid.single] at H
 
+end ConsecutiveLocations
+end FreshLocations
+
+section HeapPoset
 /-!
 ## The Heap Poset
 -/
@@ -1380,3 +1425,5 @@ theorem FMap.le_split {α β} {f g: FMap α β} :
   . simp
     apply FMap.le_union_eq
     exact H
+
+end HeapPoset
