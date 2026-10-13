@@ -525,6 +525,12 @@ theorem FMap.single_find_same {α β: Type} [DecidableEq α] {x: α} {v: β}:
 := by
   simp [Mappoid.find, Mappoid.single]
 
+@[simp, grind .]
+theorem FMap.single_find_same' {α β: Type} [DecidableEq α] {x: α} {v: β}:
+  Mappoid.find (∅[x => v]: FMap α β) x = v
+:= by
+  simp [Mappoid.find, Mappoid.single]
+
 @[simp, grind =]
 theorem FMap.union_val {α β: Type} {m1 m2: FMap α β} :
   (Mappoid.union m1 m2).val = Mappoid.union m1.val m2.val
@@ -569,6 +575,12 @@ theorem FMap.remove_val {α β: Type} [DecidableEq α] {m: FMap α β} {k: α} :
 /-!
 #### Domain
 -/
+@[simp]
+theorem FMap.mem_empty {α β: Type} (k: α):
+  (k ∈ (∅: FMap α β)) = False
+:= by
+  simp [Membership.mem, Mappoid.find, Mappoid.empty, EmptyCollection.emptyCollection]
+
 @[grind .]
 theorem FMap.mem_single_eq {α β} [DecidableEq α] {x y: α} {v: β}:
   y ∈ (∅[x => v]: FMap α β) → y = x

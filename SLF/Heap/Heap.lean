@@ -32,6 +32,8 @@ theorem HProp.imp_trans {H1 H2 H3: HProp}:
   apply h23 (h12 h1)
 
 instance: Trans HProp.Imp HProp.Imp HProp.Imp := ⟨HProp.imp_trans⟩
+instance: Trans (@Eq HProp) HProp.Imp HProp.Imp := Trans.mk $ by simp_all
+instance: Trans HProp.Imp (@Eq HProp) HProp.Imp := Trans.mk $ by simp_all
 
 @[grind ., ext]
 theorem HProp.imp_antisym {H1 H2: HProp}:
@@ -71,7 +73,7 @@ def HProp.QImp {α} (Q1 Q2: α → HProp) : Prop := ∀ a, Q1 a ==> Q2 a
 scoped notation:45 Q1:45 " ===> " Q2:45 => HProp.QImp Q1 Q2
 
 @[simp,refl, grind .]
-theorem HProp.Qimp_refl {α} {Q: α → HProp}:
+theorem HProp.qimp_refl {α} {Q: α → HProp}:
   Q ===> Q
 := by
   intro a
@@ -281,6 +283,26 @@ theorem HProp.imp_frame_right {H1 H2 H2': HProp}:
 := by
   unfold HProp.star HProp.Imp
   grind
+
+theorem HProp.imp_frame_counterexample:
+  let H1 : HProp := 0 ~~> [slf| unit]
+  let H2 : HProp := 0 ~~> [slf| unit]
+  let H3 : HProp := \[False]
+  H1 ** H2 ==> H1 ** H3 ∧ ¬ (H2 ==> H3)
+:= by
+  intro H1 H2 H3
+  and_intros
+  · intro h hstar
+    simp [HProp.star, H3]
+    obtain ⟨h1, h2, H1h1, H2h2, hdisjoint, E⟩ := hstar
+    simp [H1, H2, HProp.single] at H1h1 H2h2
+    subst h1 h2
+    clear H1 H2 H3 h E
+    rewrite [FMap.disjoint_single_single] at hdisjoint
+    contradiction
+  · intro hImp
+    specialize hImp ∅[ 0 => [slf| unit ]]
+    simp [H2, H3, HProp.single] at hImp
 
 @[simp, grind .]
 theorem HProp.imp_frame_lr {H1 H1' H2 H2': HProp}:
@@ -505,6 +527,42 @@ theorem HProp.wand_cancel {H1 H2: HProp}:
   apply I
   exists h1, h2
 
+@[simp, grind .]
+theorem HProp.wand_cancel_counterexample:
+  let H1 : HProp := 0 ~~> [slf| unit]
+  let H2 : HProp := \[]
+  let H3 : HProp := \[False]
+  H1 ** (H1 -* H2) ==> H3 ∧ ¬ H2 ==> H3
+:= by
+  intro H1 H2 H3
+  and_intros
+  · intro h hstar
+    simp [H3]
+    have hEmp : H2 h := HProp.wand_cancel h hstar
+    simp [H2] at hEmp
+    obtain ⟨h1, h2, hH1, _, _, _⟩ := hstar
+    simp_all
+    simp [H1, HProp.single] at hH1
+    have hMem : 0 ∈ h1 ∪ h2 := by
+      apply FMap.mem_union_left
+      simp_all
+    rw [hEmp] at hMem
+    simp at hMem
+  · intro hImp
+    specialize hImp ∅
+    simp [H2] at hImp
+    simp [H3, HProp.pure] at hImp
+
+example:
+  ∃ H1 H2 H3 H, H1 ** ((H1 ** H2) -* H3) ==> H ∧ ¬ (H2 -* H3) ==> H
+:= by
+  let H1 : HProp := 0 ~~> [slf| unit]
+  let H2 : HProp := \[]
+  let H3 : HProp := \[]
+  let H : HProp := \[False]
+  exists H1, H2, H3, H
+  simp [H2]
+  grind
 
 @[simp, grind .]
 theorem HProp.imp_empty_wand_same {H: HProp}:

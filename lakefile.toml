@@ -4,3 +4,8 @@ defaultTargets = ["SLF"]
 
 [[lean_lib]]
 name = "SLF"
+
+[[require]]
+name = "Quote4"
+scope = "leanprover-community"
+rev = "v4.34.0"
