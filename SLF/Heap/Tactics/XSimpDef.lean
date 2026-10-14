@@ -57,7 +57,7 @@ theorem XSimp.intro (H1 H2: HProp):
 
 open Lean Meta Elab PP Tactic Qq
 
-section XSimpHelpers
+namespace XHelpers
 /-!
 Then we build some helper functions for manipulating `**` expressions.
 -/
@@ -150,12 +150,13 @@ def searchFor! (P: Q(HProp) → Bool) (E: Q(HProp)) : MetaM Q(HProp) := do
   | some h => pure h
   | none => pure E
 
-end XSimpHelpers
+end XHelpers
 
 section XSimpStart
 /-!
 ### `xsimp_start`
 -/
+open XHelpers
 
 scoped elab "xsimpl_handle_qimpl" : tactic => withMainContext do
   -- We first get the main goal and its type
@@ -220,7 +221,7 @@ example {H1 H2 H3 H4}:
 After `xsimp_start`, we will frequently encounter `XSimp` expressions that need to be parsed and manipulated.
 -/
 
-def parseXSimp (e: Q(Prop)): MetaM (Q(HProp × HProp × HProp) × Q(HProp × HProp × HProp)) := do
+def XHelpers.parseXSimp (e: Q(Prop)): MetaM (Q(HProp × HProp × HProp) × Q(HProp × HProp × HProp)) := do
   match e with
   | ~q(XSimp $lhs $rhs) => do
     pure (lhs, rhs)

@@ -21,7 +21,7 @@ theorem XSimp.change_hla {Hla Hla' Hlw Hlt HR}:
 := by
   grind
 
-def changeHla (Hs: Q(HProp)): MetaM (TSyntax `tactic) := do
+def XHelpers.changeHla (Hs: Q(HProp)): MetaM (TSyntax `tactic) := do
   let stx ← PrettyPrinter.delab Hs
   `(tactic|
     apply XSimp.change_hla (Hla' := $stx) (by hprop_eq [XSimp])
@@ -34,7 +34,7 @@ theorem XSimp.change_hlw {Hla Hlw Hlw' Hlt HR}:
 := by
   grind
 
-def changeHlw (Hs: Q(HProp)): MetaM (TSyntax `tactic) := do
+def XHelpers.changeHlw (Hs: Q(HProp)): MetaM (TSyntax `tactic) := do
   let stx ← PrettyPrinter.delab Hs
   `(tactic|
     apply XSimp.change_hlw (Hlw' := $stx) (by hprop_eq [XSimp])
@@ -139,6 +139,8 @@ theorem XSimp.left_cancel_qwand {α} (x: α) (Q1 Q2: α → HProp) Hla Hlw Hlt H
 end NecessaryTheorems
 
 section XSimpLStepCore
+
+open XHelpers
 
 scoped elab "xsimp_step_l_core" c:bool v:bool : tactic => withMainContext do
   let cancel_wands: Bool := interpBool c
