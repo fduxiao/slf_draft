@@ -766,7 +766,7 @@ section GC
 def HProp.gc := HProp.top /- equivalent to \∃ H, \[affine H] ** H -/
 
 @[simp, grind =]
-theorem HProp.equiv:
+theorem HProp.gc_equiv:
   HProp.gc = \Top
 := by
   simp [HProp.gc]
