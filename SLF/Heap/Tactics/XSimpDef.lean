@@ -213,12 +213,13 @@ section ProtectAndXSimpHook
 `xsimp_hook` is a placeholder tactic that can be used to insert custom behavior
 during the execution of `xsimp`. It does not perform any actions by itself.
 -/
-scoped syntax "xsimp_hook": tactic
+scoped syntax "xsimp_hook" term: tactic
 /--
 The default behavior of `xsimp_hook` is to fail with the message "xsimp_hook is undefined!".
 Users can override this macro to insert custom behavior during the execution of `xsimp`.
 -/
-scoped macro "xsimp_hook" : tactic => `(tactic| fail "xsimp_hook is undefined!")
+scoped macro_rules
+  | `(tactic| xsimp_hook $_t) => `(tactic| fail "xsimp_hook is undefined!")
 
 /--
 `Protect` is a simple identity function that can be used to mark expressions
@@ -302,6 +303,12 @@ def XHelpers.parseXSimp (e: Q(Prop)): MetaM (Q(HProp × HProp × HProp) × Q(HPr
   | ~q(XSimp $lhs $rhs) => do
     pure (lhs, rhs)
   | _ => throwError "not an XSimp expression"
+
+def XHelpers.parseXSimpHla (goal: Q(HProp)): MetaM Q(HProp) := do
+  let ⟨lhs, _⟩ ← parseXSimp goal
+  match lhs with
+  | ~q(($Hla, $Hlw, $Hlt)) => pure Hla
+  | _ => throwError "unexpected lhs structure"
 
 scoped elab "print_xsimp" : tactic => do
   let goal ← getMainGoalQ

@@ -33,6 +33,33 @@ elab "#try " _name:declId ? sig:(declSig) ":=" val:term: command =>
 
 end TryCommand
 
+section PrintHypotheses
+
+open Lean Elab Tactic Meta
+
+def printHypothesis: TacticM Unit := do
+  let ctx ← MonadLCtx.getLCtx -- get the local context.
+  for decl in ctx do
+    let declExpr := decl.toExpr
+    let declType := decl.type
+    let declName := decl.userName
+
+    let displayDeclExpr : Expr → Name := fun expr =>
+      match expr.fvarId!.name with
+      | .num parent _ => parent
+      | name => name
+
+    Lean.logInfo <|
+      f!"local decl:\n" ++
+      f!"  name: {declName}\n" ++
+      f!"  expr: {displayDeclExpr declExpr}\n" ++
+      f!"  type: {← ppExpr declType}"
+
+elab "print_hypotheses" : tactic => withMainContext printHypothesis
+
+
+end PrintHypotheses
+
 section Misc
 open Lean
 

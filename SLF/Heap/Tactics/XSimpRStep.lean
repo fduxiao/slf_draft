@@ -82,6 +82,13 @@ theorem XSimp.lr_cancel_same {H Hla Hlw Hlt Hra Hrg Hrt}:
 := by
   grind
 
+theorem XSimp.lr_cancel_eq {H1 H2 Hla Hlw Hlt Hra Hrg Hrt}:
+  (H1 = H2) →
+  XSimp (Hla, Hlw, Hlt) (Hra, Hrg, Hrt) →
+  XSimp ((H1 ** Hla), Hlw, Hlt) (Hra, Hrg, (H2 ** Hrt))
+:= by
+  grind
+
 theorem XSimp.right_top_replace_gc {Hra Hrg Hrt HL}:
   XSimp HL (Hra, (\Top ** Hrg), Hrt) →
   XSimp HL (Hra, (\GC ** Hrg), (\Top ** Hrt))
@@ -130,6 +137,12 @@ def XHelpers.matchRhs (rhs: Q(HProp × HProp × HProp)): MetaM (Q(HProp) × Q(HP
   | ~q(($Hra, $Hrg, $H ** $Hrt)) => pure (Hra, Hrg, H, Hrt)
   | _ => throwError m!"unexpected RHS structure {rhs}"
 
+def XHelpers.parseXSimpHrt1 (goal: Q(HProp)): MetaM Q(HProp) := do
+  let ⟨_, rhs⟩ ← parseXSimp goal
+  match rhs with
+  | ~q(($Hla, $Hlw, $H ** $Hlt)) => pure H
+  | _ => throwError "expected ($Hla, $Hlw, $H ** $Hlt), but got {rhs}"
+
 macro "xsimpl_hgc_or_htop_cancel" t:term "by" th:term: tactic =>
   `(tactic| repeat( xsimp_pick_same $t <;> apply $th ))
 
@@ -161,7 +174,7 @@ def XHelpers.gcOrTop (Hrg H: Q(HProp)) : MetaM (TSyntax `tactic) := do
 scoped elab "xsimp_step_r_core": tactic => withMainContext do
   let goal ← getMainGoalQ
   let ⟨_lhs, rhs⟩ ← parseXSimp goal
-  let ⟨Hra, Hrg, H, Hrt⟩ ← matchRhs rhs
+  let ⟨_Hra, Hrg, H, _Hrt⟩ ← matchRhs rhs
   evalTactic <| ← match H with
     | ~q(\[]) => `(tactic| apply XSimp.right_empty)
     | ~q(\[$H]) => `(tactic| apply XSimp.right_pure)
@@ -189,11 +202,11 @@ scoped elab "xsimp_step_r_core": tactic => withMainContext do
       -- I don't understand the usage of `repr` now, so let's just throw an error.
       throwError m!"unexpected repr structure {p} ~> {v}"
     | _ =>
+      let stx ← PrettyPrinter.delab H
       if H.isMVar then
-        `(tactic | first | xsimp_hook | apply XSimp.right_keep)
+        `(tactic | first | xsimp_hook $stx | apply XSimp.right_keep)
       else
-        let stx ← PrettyPrinter.delab H
-        `(tactic | first | xsimp_cancel_same $stx | xsimp_hook | apply XSimp.right_keep)
+        `(tactic | first | xsimp_cancel_same $stx | xsimp_hook $stx | apply XSimp.right_keep)
 
 macro "xsimp_step_r" : tactic => `(tactic| xsimp_step_r_core)
 end XSimpRStepCore
@@ -243,6 +256,68 @@ example {H1 H2 H3 H4}:
   . sorry
   . sorry
 
+/-!
+single map is not in `xsimp_step_r` here.
+-/
+
+#try {p}:
+  p ~~> 3 ==> \∃ (n:Int), p ~~> n
+:= by
+  xsimp_start
+  repeat xsimp_step_l
+  xsimp_step_r
+  xsimp_step_r
+  . sorry
+  . sorry
+
+/-!
+We implement the `xsimp_hook` tactic to handle custom simplification steps during the `xsimp_step_r` process.
+-/
+open Lean Meta Elab Tactic Qq Lang XHelpers
+
+scoped macro "xsimp_cancel_by_eq": tactic => `(tactic| first | (congr <;> try rfl) | try rfl)
+scoped elab "xsimp_hook_single" _t:term: tactic => withMainContext do
+  let goal ← getMainGoalQ
+  let Hla ← parseXSimpHla goal
+  let H: Q(HProp) ← parseXSimpHrt1 goal
+  match H with
+  | ~q($p ~~> $v) =>
+    let filter (h: Q(HProp)): MetaM Bool := do
+      match h with
+      | ~q($p' ~~> $v) => pure <| p' == p
+      | _ => pure false
+    let e ← searchFor? filter Hla
+    match e with
+    | none => throwError m!"no matching HProp found for {H}"
+    | some h =>
+      let t ← changeHla h
+      evalTactic (← `(tactic| $t <;> apply XSimp.lr_cancel_eq (by xsimp_cancel_by_eq)))
+  | _ =>
+    throwError m!"not a p ~~> v: {H}"
+
+scoped macro_rules
+  | `(tactic| xsimp_hook $t) => `(tactic| xsimp_hook_single $t)
+
+example {p}:
+  p ~~> 3 ==> \∃ (n:Int), p ~~> n
+:= by
+  xsimp_start
+  repeat xsimp_step_l
+  xsimp_step_r
+  xsimp_step_r
+  simp [XSimp]
+
+#try {p H1 H2}:
+  p ~~> 3 ** H1 ==> H2 ** \∃ (n:Int), p ~~> n
+:= by
+  xsimp_start
+  repeat xsimp_step_l
+  xsimp_step_r
+  xsimp_step_r
+  xsimp_step_r
+  xsimp_step_r
+  sorry
+
 #try {H1 H2 H3} {n: Nat}:
   H1 ** H2 ** H3 ==> \[n > 3] ** H2 ** H1 ** H1
 := by
@@ -282,16 +357,20 @@ example {H1 H2 H3}:
   repeat xsimp_step_l
   repeat' xsimp_step_r
   sorry
-  sorry
 
 #try {H1 H2 H4} {p}:
   H1 ** (p ~~> 3) ==> H2 ** \∃ (n: Int), (p ~~> n ** \[n > 0]) ** H4
 := by
   xsimp_start
   repeat xsimp_step_l
-  repeat' xsimp_step_r
-  sorry
-  sorry
-  sorry
+  xsimp_step_r
+  xsimp_step_r
+  xsimp_step_r
+  xsimp_step_r
+  xsimp_step_r
+  xsimp_step_r
+  xsimp_step_r
+  . sorry
+  . sorry
 
 end Examples
