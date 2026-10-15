@@ -132,11 +132,11 @@ example {H1 H2 H3 H4} {n: Int}:
 We may frequently search for a specific component within a star conjunction and move it
 to the first, thus making the following tactic.
 -/
-def searchFor? (P: Q(HProp) → Bool) (E: Q(HProp)) : MetaM (Option Q(HProp)) := do
+def searchFor? (P: Q(HProp) → MetaM Bool) (E: Q(HProp)) : MetaM (Option Q(HProp)) := do
   let Hs ← splitStar E
   let mut i := 0
   for h in Hs do
-    if P h then
+    if ← P h then
       break
     i := i + 1
   let ⟨left, right⟩ := Hs.splitAt i
@@ -145,7 +145,7 @@ def searchFor? (P: Q(HProp) → Bool) (E: Q(HProp)) : MetaM (Option Q(HProp)) :=
   | x :: xs =>
     some <$> joinStar (x :: left ++ xs)
 
-def searchFor! (P: Q(HProp) → Bool) (E: Q(HProp)) : MetaM Q(HProp) := do
+def searchFor! (P: Q(HProp) → MetaM Bool) (E: Q(HProp)) : MetaM Q(HProp) := do
   match ← searchFor? P E with
   | some h => pure h
   | none => pure E

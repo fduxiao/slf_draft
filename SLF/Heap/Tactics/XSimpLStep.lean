@@ -173,8 +173,8 @@ scoped elab "xsimp_step_l_core" c:bool v:bool : tactic => withMainContext do
         if common.isNone then
           `(tactic| apply XSimp.left_keep_wand)
         else
-          let H1' ← searchFor! (λ h => h == common.get!) H1
-          let Hla' ← searchFor! (λ h => h == common.get!) Hla
+          let H1' ← searchFor! (λ h => pure $ h == common.get!) H1
+          let Hla' ← searchFor! (λ h => pure $ h == common.get!) Hla
           if verbose then
             if H1' != H1 then
               changeHlw q(($H1' -* $H2) ** $Hlw)
@@ -189,7 +189,7 @@ scoped elab "xsimp_step_l_core" c:bool v:bool : tactic => withMainContext do
             `(tactic| $t1 <;> $t2 <;> apply XSimp.left_cancel_wand_star)
       | _ =>
         if cancel_wands then
-          let Hs ← searchFor? (λ h => h == H1) Hla
+          let Hs ← searchFor? (λ h => pure $ h == H1) Hla
           if Hs.isNone then
             `(tactic| apply XSimp.left_keep_wand)
           else
@@ -205,7 +205,7 @@ scoped elab "xsimp_step_l_core" c:bool v:bool : tactic => withMainContext do
         `(tactic| apply XSimp.left_keep_wand)
     | ~q(($Hla, (($Q1 -** $Q2) ** $Hlw), \[])) =>
       if cancel_wands then
-        let Hs ← searchFor? (λ h => if h.isApp then h.appFn! == Q1 else false) Hla
+        let Hs ← searchFor? (λ h => pure $ if h.isApp then h.appFn! == Q1 else false) Hla
         if Hs.isNone then
           `(tactic| apply XSimp.left_keep_wand)
         else
