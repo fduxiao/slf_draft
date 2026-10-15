@@ -553,12 +553,15 @@ def higherThanLe: TSyntax `slf_term → Bool
   | `(slf_term| $_ != $_ ) => true
   | t => higherThanEq t
 
+def addBracket: TSyntax `term → UnexpandM (TSyntax `slf_term)
+  | `([slf| $t ]) => `(slf_term| $t)
+  | t => `(slf_term| [$t])
 
 @[app_unexpander Term.app]
 def unexpandApp: Unexpander
-  | `($_ [slf| $f] [slf| $a ]) => do
-    let a' ← unexpandAppArg a
-    let f' ← unexpandAppFun f
+  | `($_ $f $a) => do
+    let a' ← unexpandAppArg <| ← addBracket a
+    let f' ← unexpandAppFun <| ← addBracket f
     let t ← `(slf_term|$f' $a')
     match t with
     -- unary operators
