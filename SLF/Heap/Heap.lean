@@ -22,7 +22,7 @@ theorem HProp.imp_refl {H: HProp}: H ==> H := by
   exact hH
 
 @[grind .]
-theorem HProp.imp_trans {H1 H2 H3: HProp}:
+theorem HProp.Imp.trans {H1 H2 H3: HProp}:
   H1 ==> H2 →
   H2 ==> H3 →
   H1 ==> H3
@@ -32,6 +32,12 @@ theorem HProp.imp_trans {H1 H2 H3: HProp}:
   specialize h12 h
   specialize h23 h
   apply h23 (h12 h1)
+
+abbrev HProp.imp_trans {H1 H2 H3: HProp}:
+  H1 ==> H2 →
+  H2 ==> H3 →
+  H1 ==> H3
+:= HProp.Imp.trans
 
 instance: Trans HProp.Imp HProp.Imp HProp.Imp := ⟨HProp.imp_trans⟩
 instance: Trans (@Eq HProp) HProp.Imp HProp.Imp := Trans.mk $ by simp_all
@@ -117,8 +123,8 @@ macro_rules
   | `([fun _ : $t | $Q]) => `(fun _ : $t => $Q)
   | `([fun ($b: binder) | $Q]) => `([fun $b | $Q])
 
-notation "\\∃[" t "]" => HProp.exists t
-notation "\\∀[" t "]" => HProp.forall t
+scoped notation "\\∃[" t "]" => HProp.exists t
+scoped notation "\\∀[" t "]" => HProp.forall t
 scoped syntax:59 "\\∃ " binder+ ", " term:51: term
 scoped syntax:59 "\\∀ " binder+ ", " term:51: term
 macro_rules
@@ -445,6 +451,13 @@ theorem HProp.exists_intro {α} {x: α} {J: α → HProp} {h}:
   grind
 
 @[simp]
+theorem HProp.exists_elim' {α} {J: α → HProp} {x: α}:
+  J x ==> \∃[J]
+:= by
+  simp [HProp.exists, HProp.Imp]
+  grind
+
+@[simp, grind =]
 theorem HProp.exists_elim {α} {J: α → HProp} {h}:
   \∃[J] h = ∃ x, J x h
 := by
@@ -765,15 +778,19 @@ section GC
 @[grind]
 def HProp.gc := HProp.top /- equivalent to \∃ H, \[affine H] ** H -/
 
-@[simp, grind =]
+@[grind =]
 theorem HProp.gc_equiv:
   HProp.gc = \Top
 := by
   simp [HProp.gc]
 
-notation "\\GC" => (HProp.gc)
+scoped notation "\\GC" => (HProp.gc)
 
-@[simp, grind =]
+@[app_unexpander HProp.gc]
+def unexpandHPropGc : Lean.PrettyPrinter.Unexpander
+  | `($_) => `(\GC)
+
+@[grind =]
 theorem HProp.gc_simp:
   \GC = \Top
 := by

@@ -7,10 +7,10 @@ namespace SLF.Heap.XSimp
 
 section XSimpLStep
 
-open Lean Meta Elab Tactic Qq
+open Lean Meta Elab Tactic Qq XHelpers
 /-!
 ### `xsimp_l_step`
-A left step in the `xsimpl` process.
+A left step in the `xsimp` process.
 -/
 
 section NecessaryTheorems
@@ -39,6 +39,19 @@ def XHelpers.changeHlw (Hs: Q(HProp)): MetaM (TSyntax `tactic) := do
   `(tactic|
     apply XSimp.change_hlw (Hlw' := $stx) (by hprop_eq [XSimp])
   )
+
+elab "xsimp_pick_same" t:term : tactic => withMainContext do
+  let t ← elabTerm t q(HProp)
+  let goal ← getMainGoalQ
+  let ⟨lhs, _⟩ ← parseXSimp goal
+  let ⟨Hla, _, _⟩ ← match lhs with
+    | ~q(($Hla, $Hlw, $Hlt)) => pure (Hla, Hlw, Hlt)
+    | _ => throwError m!"unexpected LHS structure {lhs}"
+  let Hla ← searchFor? (fun stx => pure $ stx == t) Hla
+  if Hla.isNone then
+    throwError m!"term {t} not found in {lhs}"
+  let Hla := Hla.get!
+  evalTactic <| ← XHelpers.changeHla Hla
 
 theorem XSimp.left_flatten (Hla Hlw H1 H2 H3: HProp) R:
   XSimp (Hla, Hlw, (H1 ** H2) ** H3) R ↔

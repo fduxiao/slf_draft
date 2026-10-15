@@ -28,6 +28,42 @@ theorem HProp.qimp_unit {P Q: Unit → HProp}:
 
 end ExtraTheorems
 
+theorem HProp.imp_change_lhs {L L' R}:
+  L = L' →
+  (L ==> R ↔ L' ==> R)
+:= by
+  simp_all
+
+scoped macro "himp_change_lhs" t:term ":=" p:term : tactic =>
+  `(tactic| rw [HProp.imp_change_lhs (L' := (($t): HProp)) $p])
+
+scoped macro "himp_change_lhs" t:term "at" h:ident ":=" p:term : tactic =>
+  `(tactic| rw [HProp.imp_change_lhs (L' := (($t): HProp)) $p] at $h:ident)
+
+theorem HProp.imp_change_rhs {L R R'}:
+  R = R' →
+  (L ==> R ↔ L ==> R')
+:= by
+  simp_all
+
+scoped macro "himp_change_rhs" t:term ":=" p:term : tactic =>
+  `(tactic| rw [HProp.imp_change_rhs (R' := (($t): HProp)) $p])
+
+scoped macro "himp_change_rhs" t:term "at" h:ident ":=" p:term : tactic =>
+  `(tactic| rw [HProp.imp_change_rhs (R' := (($t): HProp)) $p] at $h:ident)
+
+example {H1 H2 H3 H4}:
+  H1 = H2 →
+  H2 ==> H3 →
+  H3 = H4 →
+  H1 ==> H4
+:= by
+  intro M1 M2 M3
+  himp_change_lhs H2 := M1
+  himp_change_rhs _ at M2 := M3
+  exact M2
+
+
 /-!
 ## `xsimp` tactic for `**` expressions
 -/
@@ -150,7 +186,47 @@ def searchFor! (P: Q(HProp) → MetaM Bool) (E: Q(HProp)) : MetaM Q(HProp) := do
   | some h => pure h
   | none => pure E
 
+section repr
+def repr {α: Type} (S:α → HProp) (x:α) : HProp := S x
+
+scoped notation:67 x " ~> " S => (repr S x)
+
+@[app_unexpander repr]
+def unexpandRepr : Lean.PrettyPrinter.Unexpander
+| `($_ $S $x) => `($x ~> $S)
+| _ => throw ()
+
+theorem repr.eq {α:Type} {S:α → HProp} {x:α}:
+  (x ~> S) = (S x)
+:= by
+  simp [repr]
+
+def repr.Id {A:Type} (X:A) (x:A) := \[ X = x ]
+
+end repr
+
 end XHelpers
+
+
+section ProtectAndXSimpHook
+/--
+`xsimp_hook` is a placeholder tactic that can be used to insert custom behavior
+during the execution of `xsimp`. It does not perform any actions by itself.
+-/
+scoped syntax "xsimp_hook": tactic
+/--
+The default behavior of `xsimp_hook` is to fail with the message "xsimp_hook is undefined!".
+Users can override this macro to insert custom behavior during the execution of `xsimp`.
+-/
+scoped macro "xsimp_hook" : tactic => `(tactic| fail "xsimp_hook is undefined!")
+
+/--
+`Protect` is a simple identity function that can be used to mark expressions
+that should be protected from `xsimp`.
+-/
+def Protect {α} (x : α) : α := x
+
+end ProtectAndXSimpHook
 
 section XSimpStart
 /-!
