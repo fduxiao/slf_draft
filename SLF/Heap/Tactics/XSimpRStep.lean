@@ -160,7 +160,7 @@ def XHelpers.gcOrTop (Hrg H: Q(HProp)) : MetaM (TSyntax `tactic) := do
 
 scoped elab "xsimp_step_r_core": tactic => withMainContext do
   let goal ← getMainGoalQ
-  let ⟨lhs, rhs⟩ ← parseXSimp goal
+  let ⟨_lhs, rhs⟩ ← parseXSimp goal
   let ⟨Hra, Hrg, H, Hrt⟩ ← matchRhs rhs
   evalTactic <| ← match H with
     | ~q(\[]) => `(tactic| apply XSimp.right_empty)
@@ -175,8 +175,12 @@ scoped elab "xsimp_step_r_core": tactic => withMainContext do
         else
           throwError m!"unexpected wand structure {H} -* {H'}"
     | ~q(HProp.exists $P) =>
-      --   | hexists ?J => xsimpl_r_hexists_apply tt
-      throwError m!"unexpected exists structure {H}"
+      let hintValue ← hasNextHint
+      match hintValue with
+      | none => `(tactic| apply XSimp.right_exists)
+      | some v =>
+        let stx ← PrettyPrinter.delab v
+        `(tactic| apply XSimp.right_exists (x := $stx))
     | ~q(\GC) => gcOrTop Hrg H
     | ~q(\Top) => gcOrTop Hrg H
     | ~q(Protect $H) => `(tactic| apply XSimp.right_keep)
@@ -196,7 +200,7 @@ end XSimpRStepCore
 
 section Examples
 
-#try {H1 H2 H3}:
+example {H1 H2 H3}:
   H1 ** \GC ** H2 ** H3 ==> H1 ** \GC ** H2 ** H3
 := by
   xsimp_start
@@ -208,7 +212,7 @@ section Examples
   xsimp_step_r
   xsimp_step_r
   xsimp_step_r
-  sorry
+  simp [XSimp]
 
 #try {H1 H2 H3}:
   H1 ** H2 ** H3 ==> H2 ** H1 ** H1
@@ -236,8 +240,8 @@ example {H1 H2 H3 H4}:
   xsimp_start
   repeat xsimp_step_l
   repeat' xsimp_step_r
-  sorry
-  sorry
+  . sorry
+  . sorry
 
 #try {H1 H2 H3} {n: Nat}:
   H1 ** H2 ** H3 ==> \[n > 3] ** H2 ** H1 ** H1
@@ -245,30 +249,49 @@ example {H1 H2 H3 H4}:
   xsimp_start
   repeat xsimp_step_l
   repeat' xsimp_step_r
-  sorry
-  sorry
+  . sorry
+  . sorry
 
-#try xsimpl_demo_rhs_hexists {H1 H2 H3 H4 p}:
-  H1 ==> H2 ** \∃ (n: Nat), (p ~~> n ** H3) ** H4
+example {H1 H2 H3}:
+  H1 ** H2 ** H3 ==> (\∃ n: Nat, \[n > 3]) ** H2 ** H1 ** H3
+:= by
+  xsimp_hint_put 4
+  xsimp_start
+  repeat xsimp_step_l
+  xsimp_step_r
+  xsimp_step_r
+  xsimp_step_r
+  . grind
+  . hprop_eq
+
+#try {H1 H2 H3 H4 p}:
+  H1 ==> H2 ** \∃ (n: Int), (p ~~> n ** H3) ** H4
 := by
   xsimp_start
   repeat xsimp_step_l
-  repeat' xsimp_step_r
-  sorry
+  xsimp_step_r
+  xsimp_step_r
+  xsimp_step_r
+  . sorry
+  . sorry
 
 #try {H1 H2 H3 H4} {p}:
-  H1 ** (p ~~> 3) ==> H2 ** \∃ (n: Nat), (p ~~> n ** H3) ** H4
+  H1 ** (p ~~> 3) ==> H2 ** \∃ (n: Int), (p ~~> n ** H3) ** H4
 := by
   xsimp_start
   repeat xsimp_step_l
   repeat' xsimp_step_r
+  sorry
   sorry
 
 #try {H1 H2 H4} {p}:
-  H1 ** (p ~~> 3) ==> H2 ** \∃ (n: Nat), (p ~~> n ** \[n > 0]) ** H4
+  H1 ** (p ~~> 3) ==> H2 ** \∃ (n: Int), (p ~~> n ** \[n > 0]) ** H4
 := by
   xsimp_start
   repeat xsimp_step_l
   repeat' xsimp_step_r
   sorry
+  sorry
+  sorry
+
 end Examples
