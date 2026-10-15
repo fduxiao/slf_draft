@@ -123,13 +123,15 @@ macro_rules
   | `([fun _ : $t | $Q]) => `(fun _ : $t => $Q)
   | `([fun ($b: binder) | $Q]) => `([fun $b | $Q])
 
-scoped notation "\\∃[" t "]" => HProp.exists t
-scoped notation "\\∀[" t "]" => HProp.forall t
+scoped syntax "\\∃[" term "]": term
+scoped syntax "\\∀[" term "]": term
 scoped syntax:59 "\\∃ " binder+ ", " term:51: term
 scoped syntax:59 "\\∀ " binder+ ", " term:51: term
 macro_rules
+  | `(\∃[ $a ]) => `(HProp.exists $a)
   | `(\∃ $b, $Q) => `(HProp.exists ([fun $b | $Q]))
   | `(\∃ $b $[$b']*, $Q) => `(HProp.exists ([fun $b | \∃ $[$b']*, $Q]))
+  | `(\∀[ $a ]) => `(HProp.forall $a)
   | `(\∀ $b, $Q) => `(HProp.forall ([fun $b | $Q]))
   | `(\∀ $b $[$b']*, $Q) => `(HProp.forall ([fun $b | \∀ $[$b']*, $Q]))
 
