@@ -325,3 +325,183 @@ scoped elab "print_xsimp" : tactic => do
 ```
 -/
 end XSimpStart
+
+section XSimpHint
+open XHelpers
+
+structure Box where
+  T: Type
+  value: T
+
+def Box.new {T: Type} (value: T): Box :=
+  { T := T, value := value }
+
+@[app_unexpander Box.new]
+def unexpandBoxNew : Lean.PrettyPrinter.Unexpander
+  | `($_ $t) => `($t)
+  | _ => throw ()
+
+inductive XHole where
+  | hole : XHole
+
+def Box.isHoleQ (b: Q(Box)): MetaM Bool := do
+  match b with
+  | ~q(Box.new XHole.hole) => pure true
+  | _ => pure false
+
+@[app_unexpander XHole.hole]
+def unexpandXHole : Lean.PrettyPrinter.Unexpander
+  | _ => `(_)
+
+def XSimpHint := List Box deriving Inhabited
+
+partial def XSimpHint.appendQ (a b: Q(XSimpHint)): MetaM Q(XSimpHint) := do
+  match a with
+  | ~q([]) => pure b
+  | ~q($x :: $xs) =>
+    let y ← XSimpHint.appendQ xs b
+    pure q($x :: $y)
+
+def XHelpers.addXSimpHint (hint: Q(XSimpHint)): TacticM Unit :=
+  liftMetaTactic fun mvarId => do
+    let mvarIdNew ← mvarId.define `xsimp_hint q(XSimpHint) hint
+    let (_, mvarIdNew) ← mvarIdNew.intro1P
+    return [mvarIdNew]
+
+def XHelpers.findXSimpHint?: MetaM (Option Q(XSimpHint)) := do
+  let ctx ← MonadLCtx.getLCtx
+  for decl in ctx do
+    if decl.type == q(XSimpHint) then
+      return some decl.toExpr
+  return none
+
+def XHelpers.clearXSimpHint: TacticM Unit := do
+  let ctx ← MonadLCtx.getLCtx -- get the local context.
+  for decl in ctx do
+    let declType := decl.type -- Find the type of the declaration.
+    if declType != q(XSimpHint) then
+      continue
+    -- clear the decl
+    liftMetaTactic fun mvarId => do
+      let mvarId ← mvarId.clear decl.fvarId
+      return [mvarId]
+
+scoped elab "xsimp_hint_clear" : tactic => withMainContext do
+  XHelpers.clearXSimpHint
+
+def XHelpers.replaceXSimpHint (hint: Q(XSimpHint)): TacticM Unit := do
+  let old ← XHelpers.findXSimpHint?
+  if old.isSome then
+    clearXSimpHint
+  else
+    pure ()
+  addXSimpHint hint
+
+def XHelpers.makeXSimpHint (ts: List Q(Box)): Q(XSimpHint) :=
+  match ts with
+  | [] => q([])
+  | a :: b =>
+    let b := XHelpers.makeXSimpHint b
+    q($a :: $b)
+
+scoped elab "xsimp_hint_put" ts:term,+ : tactic => withMainContext do
+  let mut result: Array Q(Box) := Array.mk []
+  for t in ts.getElems do
+    let t ← match t with
+      | `(_) => `(Box.new XHole.hole)
+      | _ => `(Box.new $t)
+    let t ← elabTerm t none
+    result := result.push t
+  let hint := makeXSimpHint result.toList
+  let old ← XHelpers.findXSimpHint?
+  match old with
+  | none => XHelpers.addXSimpHint hint
+  | some old =>
+    let hint ← XSimpHint.appendQ old hint
+    XHelpers.replaceXSimpHint <| hint
+
+def XHelpers.findXSimpHint!: MetaM (Q(XSimpHint)) := do
+  let result ← XHelpers.findXSimpHint?
+  match result with
+  | some r => return r
+  | none => throwError "no XSimpHint found"
+
+def XHelpers.popXSimpHint?: TacticM (Option Q(Box)) := do
+  let hint ← XHelpers.findXSimpHint?
+  if hint.isNone then
+    return none
+  let hint := hint.get!
+  match hint with
+  | ~q([]) => return none
+  | ~q(($x :: $xs)) =>
+    -- set decl to the rest of the hint
+    let xs: Q(XSimpHint) := xs
+    replaceXSimpHint xs
+    return (some x)
+
+def XHelpers.popXSimpHint!: TacticM Q(Box) := do
+  let hint ← XHelpers.findXSimpHint!
+  match hint with
+  | ~q([]) => throwError m!"xsimp_hint_next: hint is empty"
+  | ~q(($x :: $xs)) =>
+    -- set decl to the rest of the hint
+    let xs: Q(XSimpHint) := xs
+    replaceXSimpHint xs
+    return x
+
+scoped elab "xsimp_hint_next" x:term " => " t:tactic : tactic => withMainContext do
+  let h ← XHelpers.popXSimpHint!
+  let stx ← PrettyPrinter.delab h
+  evalTactic <| ← match x with
+  | `(_) => `(tactic| $t)
+  | `($x:ident) =>
+    let b ← Box.isHoleQ h
+    let letT ← if b then
+      `(tactic| let $x := XHole.hole)
+    else
+      `(tactic| let $x := $stx)
+    `(tactic| $letT <;> $t <;> unfold $x at * <;> clear $x)
+  | _ => throwError "unexpected pattern in xsimp_hint_next"
+
+macro "xsimp_hint_next" " => " t:tactic : tactic => `(tactic| xsimp_hint_next _ => $t)
+
+def XHelpers.hasNextHint : MetaM (Option Q(Box)) := do
+  let old ← XHelpers.findXSimpHint?
+  match old with
+  | some hint =>
+    match hint with
+    | ~q([]) => pure none
+    | ~q(($x :: $xs)) =>
+      if ← Box.isHoleQ x then
+        pure none
+      else
+        pure (some x)
+  | none => pure none
+
+scoped elab "xsimp_has_next" : tactic => withMainContext do
+  if (← hasNextHint).isSome then
+    pure ()
+  else
+    throwError m!"xsimp_has_next: no next hint available"
+
+example:
+  ∃ n, n = 3
+:= by
+  let h := 1
+  xsimp_hint_put true, _, 3
+  xsimp_hint_put 4, 6
+  xsimp_hint_next x => skip
+  xsimp_hint_next x => skip  -- we are able to detect holes
+  xsimp_hint_next _ => skip  -- we don't need the value
+  xsimp_hint_next => skip  -- or omit the variable entirely
+  xsimp_hint_next => skip
+  -- the hint is empty now
+  fail_if_success xsimp_hint_next x => skip
+  fail_if_success xsimp_has_next
+  xsimp_hint_put 3
+  xsimp_has_next  -- next hint is not empty
+  xsimp_hint_next x => apply Exists.intro x
+  xsimp_hint_clear
+  rfl
+
+end XSimpHint
