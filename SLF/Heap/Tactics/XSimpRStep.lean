@@ -186,7 +186,9 @@ scoped elab "xsimp_step_r_core": tactic => withMainContext do
         if H' == H then
           `(tactic| apply XSimp.right_wand_same)
         else
-          throwError m!"unexpected wand structure {H} -* {H'}"
+          -- fall back to the default tactic
+          let stx ← PrettyPrinter.delab H
+          `(tactic | first | xsimp_hook $stx | apply XSimp.right_keep)
     | ~q(HProp.exists $P) =>
       let hintValue ← hasNextHint
       match hintValue with
