@@ -166,7 +166,16 @@ scoped elab "xsimp_step_l_core" c:bool v:bool : tactic => withMainContext do
       | ~q(\[]) => `(tactic| apply XSimp.left_empty)
       | ~q(\[$P]) => `(tactic| apply XSimp.left_pure <;> intro)
       | ~q($H1 ** $H2) => `(tactic| rw [XSimp.left_flatten])
-      | ~q(HProp.exists $J) => `(tactic| apply XSimp.left_exists <;> intro)
+      | ~q(HProp.exists $J) =>
+        let J: Expr := J
+        if J.isLambda then
+          let x := J.bindingName!
+          let i := Lean.mkIdent x
+          `(tactic|
+            apply XSimp.left_exists <;>
+            intro $i:ident)
+        else
+          `(tactic| apply XSimp.left_exists <;> intro)
       | ~q($H1 -* $H2) => `(tactic| apply XSimp.left_acc_wand)
       | ~q($H1 -** $H2) => `(tactic| apply XSimp.left_acc_wand)
       | _ => `(tactic| apply XSimp.left_acc_other)
@@ -254,6 +263,14 @@ section Examples
   xsimp_step_l
   xsimp_step_l
   xsimp_step_l
+  xsimp_step_l
+  sorry
+
+-- this will be generated into a `forall`, and we have to make sure the variable names are preserved.
+#try {H}:
+  \∃ v, \[v = 2] ==> H
+:= by
+  xsimp_start
   xsimp_step_l
   sorry
 
