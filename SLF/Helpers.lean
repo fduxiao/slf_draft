@@ -33,6 +33,66 @@ elab "#try " _name:declId ? sig:(declSig) ":=" val:term: command =>
 
 end TryCommand
 
+section CheckPP
+open Lean Elab Tactic Meta
+
+elab "check_goal" exp:term : tactic => withMainContext do
+  let goal ← getMainGoal
+  let goal ← goal.getType
+  let goal ← instantiateMVars goal
+
+  let expected: Expr ← elabTerm exp none
+  let eq ← isDefEq goal expected
+
+  if eq then
+    pure ()
+  else
+    throwError m!"expected: `({expected}), got: `({goal})"
+
+example : True := by
+  check_goal True
+  fail_if_success check_goal False
+  trivial
+
+def Helpers.check_decl
+  (i: TSyntax `ident)
+  (ty: TSyntax `term)
+  (tm: TSyntax `term): TacticM Unit
+:= do
+  let decl ← getLocalDeclFromUserName i.getId
+  let declType ← instantiateMVars decl.type
+  let expected: Expr ← elabTerm ty none
+  if !(← isDefEq declType expected) then
+    throwError m!"expected: `({expected}), got: `({declType})"
+  let expectedVal ← elabTerm tm none
+  let declVal := decl.value?
+  if declVal.isNone then
+    return ()
+  let declVal ← instantiateMVars declVal.get!
+  if !(← isDefEq declVal expectedVal) then
+    throwError m!"expected value: `({expectedVal}), got: `({declVal})"
+
+elab "check_decl" i:ident ":" ty:term ":=" tm:term : tactic => withMainContext do
+  Helpers.check_decl i ty tm
+
+macro "check_decl" i:ident ":" ty:term : tactic => `(tactic| check_decl $i : $ty := _)
+macro "check_decl" i:ident ":=" tm:term : tactic => `(tactic| check_decl $i : _ := $tm)
+
+example {P1 P2: Prop}:
+  P1 → P2 → P1
+:= by
+  check_decl P1 : Prop
+  fail_if_success check_decl P2 : Nat
+  intro H1 H2
+  check_decl H1 : P1
+  check_decl H2 : P2
+  let n : Nat := 3
+  check_decl n : Nat := 3
+  fail_if_success check_decl n : Nat := 2
+  trivial
+
+end CheckPP
+
 section PrintHypotheses
 
 open Lean Elab Tactic Meta

@@ -220,13 +220,29 @@ example {H1 H2 H3}:
 := by
   xsimp_start
   repeat xsimp_step_l
+  check_goal
+    XSimp
+    (H3 ** H2 ** \GC ** H1 ** \[], \[], \[])
+    (\[], \[], (H1 ** \GC ** H2 ** H3) ** \[])
   xsimp_step_r
   xsimp_step_r
   xsimp_step_r
+  check_goal
+    XSimp
+    (H3 ** H2 ** \GC ** \[], \[], \[])
+    (\[], \[], \GC ** (H2 ** H3) ** \[])
+  xsimp_step_r
+  check_goal
+    XSimp
+    (H3 ** H2 ** \[], \[], \[])
+    (\[], \GC ** \[], (H2 ** H3) ** \[])
+  xsimp_step_r
+  check_goal
+    XSimp (H3 ** H2 ** \[], \[], \[]) (\[], \GC ** \[], H2 ** H3 ** \[])
   xsimp_step_r
   xsimp_step_r
-  xsimp_step_r
-  xsimp_step_r
+  check_goal
+    XSimp (\[], \[], \[]) (\[], \GC ** \[], \[])
   simp [XSimp]
 
 #try {H1 H2 H3}:
@@ -237,7 +253,11 @@ example {H1 H2 H3}:
   xsimp_step_r
   xsimp_step_r
   xsimp_step_r
+  check_goal
+    XSimp (H3 ** H1 ** \[], \[], \[]) (\[], \[], H1 ** H1 ** \[])
   xsimp_step_r
+  check_goal
+    XSimp (H3 ** \[], \[], \[]) (\[], \[], H1 ** \[])
   xsimp_step_r
   sorry
 
@@ -247,6 +267,8 @@ example {H1 H2 H3 H4}:
   xsimp_start
   repeat xsimp_step_l
   repeat' xsimp_step_r
+  check_goal
+    XSimp (\[], \[], \[]) (\[], \[], \[])
   simp [XSimp]
 
 #try {H1 H2 H3} {P}:
@@ -255,13 +277,16 @@ example {H1 H2 H3 H4}:
   xsimp_start
   repeat xsimp_step_l
   repeat' xsimp_step_r
-  . sorry
-  . sorry
+  . check_goal P
+    sorry
+  . check_goal XSimp (H3 ** \[], \[], \[]) (H1 ** \[], \[], \[])
+    sorry
 
 /-!
 single map is not in `xsimp_step_r` here.
 -/
 
+open Lang in
 #try {p}:
   p ~~> 3 ==> \∃ (n:Int), p ~~> n
 := by
@@ -269,8 +294,11 @@ single map is not in `xsimp_step_r` here.
   repeat xsimp_step_l
   xsimp_step_r
   xsimp_step_r
-  . sorry
-  . sorry
+  . check_goal
+      XSimp (p ~~> 3 ** \[], \[], \[]) (p ~~> [slf| [?x] ] ** \[], \[], \[])
+    sorry
+  . check_goal Int
+    sorry
 
 /-!
 We implement the `xsimp_hook` tactic to handle custom simplification steps during the `xsimp_step_r` process.
@@ -306,7 +334,9 @@ example {p}:
   xsimp_start
   repeat xsimp_step_l
   xsimp_step_r
+  check_goal XSimp (p ~~> 3 ** \[], \[], \[]) (\[], \[], p ~~> [slf| [?x] ] ** \[])
   xsimp_step_r
+  check_goal XSimp (\[], \[], \[]) (\[], \[], \[])
   simp [XSimp]
 
 #try {p H1 H2}:
@@ -316,8 +346,14 @@ example {p}:
   repeat xsimp_step_l
   xsimp_step_r
   xsimp_step_r
+  check_goal
+    XSimp (H1 ** p ~~> 3 ** \[], \[], \[]) (H2 ** \[], \[], (\∃ (n: Int), p ~~> [slf| [n] ]) ** \[])
   xsimp_step_r
+  check_goal
+    XSimp (H1 ** p ~~> 3 ** \[], \[], \[]) (H2 ** \[], \[], p ~~> [slf| [?x] ] ** \[])
   xsimp_step_r
+  check_goal
+    XSimp (H1 ** \[], \[], \[]) (H2 ** \[], \[], \[])
   sorry
 
 #try {H1 H2 H3} {n: Nat}:
@@ -326,8 +362,11 @@ example {p}:
   xsimp_start
   repeat xsimp_step_l
   repeat' xsimp_step_r
-  . sorry
-  . sorry
+  . check_goal n > 3
+    sorry
+  . check_goal
+      XSimp (H3 ** \[], \[], \[]) (H1 ** \[], \[], \[])
+    sorry
 
 example {H1 H2 H3}:
   H1 ** H2 ** H3 ==> (\∃ n: Nat, \[n > 3]) ** H2 ** H1 ** H3
@@ -338,8 +377,9 @@ example {H1 H2 H3}:
   xsimp_step_r
   xsimp_step_r
   xsimp_step_r
+  . check_goal 4 > 3
+    grind
   . grind
-  . hprop_eq
 
 #try {H1 H2 H3 H4 p}:
   H1 ==> H2 ** \∃ (n: Int), (p ~~> n ** H3) ** H4
@@ -349,8 +389,11 @@ example {H1 H2 H3}:
   xsimp_step_r
   xsimp_step_r
   xsimp_step_r
-  . sorry
-  . sorry
+  . check_goal
+      XSimp (H1 ** \[], \[], \[]) (H2 ** \[], \[], ((p ~~> [slf| [?x] ] ** H3) ** H4) ** \[])
+    sorry
+  . check_goal Int
+    sorry
 
 #try {H1 H2 H3 H4} {p}:
   H1 ** (p ~~> 3) ==> H2 ** \∃ (n: Int), (p ~~> n ** H3) ** H4
@@ -358,6 +401,8 @@ example {H1 H2 H3}:
   xsimp_start
   repeat xsimp_step_l
   repeat' xsimp_step_r
+  check_goal
+    XSimp (H1 ** \[], \[], \[]) (H4 ** H3 ** H2 ** \[], \[], \[])
   sorry
 
 #try {H1 H2 H4} {p}:
@@ -372,7 +417,10 @@ example {H1 H2 H3}:
   xsimp_step_r
   xsimp_step_r
   xsimp_step_r
-  . sorry
-  . sorry
+  . check_goal ((3: Int) > 0)
+    sorry
+  . check_goal
+      XSimp (H1 ** \[], \[], \[]) (H2 ** \[], \[], H4 ** \[])
+    sorry
 
 end Examples
