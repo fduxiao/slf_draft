@@ -187,13 +187,14 @@ scoped elab "xsimp_step_r_core": tactic => withMainContext do
           `(tactic| apply XSimp.right_wand_same)
         else
           -- fall back to the default tactic
-          let stx ← PrettyPrinter.delab H
+          let stx ← delabNoPP H
           `(tactic | first | xsimp_hook $stx | apply XSimp.right_keep)
     | ~q(HProp.exists $P) =>
       let hintValue ← hasNextHint
       match hintValue with
       | none => `(tactic| apply XSimp.right_exists)
       | some v =>
+        -- This `v` should be put with notations
         let stx ← PrettyPrinter.delab v
         `(tactic| apply XSimp.right_exists (x := $stx))
     | ~q(\GC) => gcOrTop Hrg H
@@ -204,7 +205,7 @@ scoped elab "xsimp_step_r_core": tactic => withMainContext do
       -- I don't understand the usage of `repr` now, so let's just throw an error.
       throwError m!"unexpected repr structure {p} ~> {v}"
     | _ =>
-      let stx ← PrettyPrinter.delab H
+      let stx ← delabNoPP H
       if H.isMVar then
         `(tactic | first | xsimp_hook $stx | apply XSimp.right_keep)
       else

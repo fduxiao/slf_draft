@@ -482,6 +482,7 @@ def XHelpers.popXSimpHint!: TacticM Q(Box) := do
 
 scoped elab "xsimp_hint_next" x:term " => " t:tactic : tactic => withMainContext do
   let h ← XHelpers.popXSimpHint!
+  -- I need the unexpander for `Box.new`
   let stx ← PrettyPrinter.delab h
   evalTactic <| ← match x with
   | `(_) => `(tactic| $t)

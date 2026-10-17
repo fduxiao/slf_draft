@@ -117,8 +117,15 @@ def printHypothesis: TacticM Unit := do
 
 elab "print_hypotheses" : tactic => withMainContext printHypothesis
 
-
 end PrintHypotheses
+
+section DelabNoPP
+open Lean
+
+def delabNoPP (e: Expr): MetaM Term := do
+  withOptions (fun opts => opts.setBool `pp.all true) do
+    PrettyPrinter.delab e
+end DelabNoPP
 
 section Misc
 open Lean
