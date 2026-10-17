@@ -182,7 +182,7 @@ end Definition
 
 section Macros
 scoped macro_rules
-| `([slf| [$t] ]) => `((($t): Term))
+| `([slf| [$t] ]) => `(($t))
 | `([slf| ( $t ) ]) => `([slf| $t ])
 | `([slf| $t:ident ]) => `(Term.var $(Lean.quote t.getId.toString))
 | `([slf| $t:num ]) => `(Val.int $(Lean.quote t.getNat))
@@ -709,7 +709,7 @@ def l: Loc := 3
 #guard slf_pp [slf| true] = "[slf| true ]"
 #guard slf_pp ([slf| true]: Term) = "[slf| true ]"
 #guard slf_pp Val.bool b = "[slf| [b] ]"
-#guard slf_pp [slf| [b == b]] = "[slf| [b == b] ]"
+#guard slf_pp ([slf| [b == b]]: Term) = "[slf| [b == b] ]"
 -- unit value
 #guard slf_pp Val.unit = "[slf| unit ]"
 #guard slf_pp Term.val Val.unit = "[slf| unit ]"
@@ -728,7 +728,7 @@ def l: Loc := 3
 -- terms
 #guard slf_pp Term.var x = "[slf| [x] ]"
 #guard slf_pp [slf| x] = "[slf| x ]"
-#guard slf_pp [slf| ["x"]] = "[slf| x ]"
+#guard slf_pp ([slf| ["x"]]: Term) = "[slf| x ]"
 #guard slf_pp [slf| [x ++ "y"] y z] = "[slf| [x ++ \"y\"] y z ]"
 #guard slf_pp [slf| (x y) z] = "[slf| x y z ]"
 #guard slf_pp [slf| x (y z)] = "[slf| x (y z) ]"
@@ -763,7 +763,7 @@ def l: Loc := 3
 -- `ref`, `free`, `not` are printed as is
 def prim := Val.prim Prim.get
 #guard slf_pp prim = "prim"
-#guard slf_pp [slf| [prim]] = "[slf| [prim] ]"
+#guard slf_pp ([slf| [prim]]: Term) = "[slf| [prim] ]"
 #guard slf_pp [slf| ref] = "[slf| ref ]"
 #guard slf_pp [slf| ref x] = "[slf| ref x ]"
 #guard slf_pp [slf| free] = "[slf| free ]"
@@ -788,7 +788,7 @@ def prim := Val.prim Prim.get
 #guard slf_pp [slf| [num] + [i] ] = "[slf| [num] + [i] ]"
 -- #guard slf_pp [slf| [3] + [i] ] = "[slf| 3 + [i] ]"
 #guard slf_pp (Term.val (.int (i + i))) = "[slf| [i + i] ]"
-#guard slf_pp [slf| [i + i] ] = "[slf| [i + i] ]"
+#guard slf_pp ([slf| [i + i] ]: Term) = "[slf| [i + i] ]"
 #guard slf_pp [slf| (x := y) + y] = "[slf| (x := y) + y ]"
 #guard slf_pp [slf| (x + y) + z] = "[slf| x + y + z ]"
 #guard slf_pp [slf| x + (y + z)] = "[slf| x + (y + z) ]"
