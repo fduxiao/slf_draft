@@ -264,7 +264,7 @@ section Examples
   xsimp_step_l
   xsimp_step_l
   xsimp_step_l
-  check_goal XSimp (H3 ** H1 ** H2 ** \[], \[], \[]) (\[], \[], H4 ** \[])
+  guard_target = XSimp (H3 ** H1 ** H2 ** \[], \[], \[]) (\[], \[], H4 ** \[])
   sorry
 
 -- this will be generated into a `forall`, and we have to make sure the variable names are preserved.
@@ -272,15 +272,15 @@ section Examples
   \∃ v, \[v = 2] ==> H
 := by
   xsimp_start
-  check_goal XSimp (\[], \[], (\∃ v, \[v = 2]) ** \[]) (\[], \[], H ** \[])
+  guard_target = XSimp (\[], \[], (\∃ v, \[v = 2]) ** \[]) (\[], \[], H ** \[])
   xsimp_step_l
   rename_i v
-  check_decl v: Nat
-  check_goal XSimp (\[], \[], \[v = 2] ** \[]) (\[], \[], H ** \[])
+  guard_hyp v: Nat
+  guard_target = XSimp (\[], \[], \[v = 2] ** \[]) (\[], \[], H ** \[])
   xsimp_step_l
-  check_goal XSimp (\[], \[], \[]) (\[], \[], H ** \[])
+  guard_target = XSimp (\[], \[], \[]) (\[], \[], H ** \[])
   rename_i k
-  check_decl k: v = 2
+  guard_hyp k: v = 2
   sorry
 
 #try {H1 H2 H3 H4} {n: Int}:
@@ -298,8 +298,8 @@ section Examples
   xsimp_step_l
   xsimp_step_l
   rename_i h
-  check_decl h: n > 0
-  check_goal XSimp (H3 ** H1 ** H2 ** H2 ** \[], \[], \[]) (\[], \[], H4 ** \[])
+  guard_hyp h: n > 0
+  guard_target = XSimp (H3 ** H1 ** H2 ** H2 ** \[], \[], \[]) (\[], \[], H4 ** \[])
   sorry
 
 #try {H1 H2 H3 H4} {n: Int}:
@@ -319,10 +319,10 @@ section Examples
   xsimp_step_l
   xsimp_step_l
   rename_i h1 h2
-  check_decl x: Nat
-  check_decl h1: x = 2
-  check_decl h2: n > 0
-  check_goal XSimp (H3 ** H1 ** H2 ** H2 ** \[], \[], \[]) (\[], \[], H4 ** \[])
+  guard_hyp x: Nat
+  guard_hyp h1: x = 2
+  guard_hyp h2: n > 0
+  guard_target = XSimp (H3 ** H1 ** H2 ** H2 ** \[], \[], \[]) (\[], \[], H4 ** \[])
   sorry
 
 #try {H1 H2 H3 H4 H5}:
@@ -346,12 +346,12 @@ section Examples
   xsimp_step_l
   xsimp_step_l
   xsimp_step_l
-  check_goal
+  guard_target =
     XSimp
     (H4 ** H1 ** H2 ** \[], (H2 -* H3) ** \[], \[])
     (\[], \[], H5 ** \[])
   xsimp_step_l
-  check_goal
+  guard_target =
     XSimp
     (\[], \[], (H4 ** H1 ** \[]) ** H3 ** \[])
     (\[], \[], H5 ** \[])
@@ -372,7 +372,7 @@ If it cannot be eliminated, it should be kept as is.
   xsimp_step_l
   xsimp_step_l
   xsimp_step_l -- We can no longer eliminate the wand
-  check_goal XSimp ((H2 -* H3) ** H4 ** H1 ** \[], \[], \[]) (\[], \[], H5 ** \[])
+  guard_target = XSimp ((H2 -* H3) ** H4 ** H1 ** \[], \[], \[]) (\[], \[], H5 ** \[])
   fail_if_success xsimp_step_l
   sorry
 
@@ -388,32 +388,32 @@ If we have `(H2 ** H1) -* H3`, it should be canceled appropriately.
   xsimp_step_l
   xsimp_step_l
   xsimp_step_l
-  check_goal
+  guard_target =
     XSimp
     (H4 ** H1 ** \[], (H2 ** H1 -* H3) ** \[], \[])
     (\[], \[], H5 ** \[])
   xsimp_step_l verbose
-  check_goal
+  guard_target =
     XSimp
     (H4 ** H1 ** \[], (H1 ** H2 -* H3) ** \[], \[])
     (\[], \[], H5 ** \[])
   xsimp_step_l verbose
-  check_goal
+  guard_target =
     XSimp
     (H1 ** H4 ** \[], (H1 ** H2 -* H3) ** \[], \[])
     (\[], \[], H5 ** \[])
   xsimp_step_l verbose
-  check_goal
+  guard_target =
     XSimp
     (H4 ** \[], \[], (H2 -* H3) ** \[])
     (\[], \[], H5 ** \[])
   xsimp_step_l verbose
-  check_goal
+  guard_target =
     XSimp
     (H4 ** \[], (H2 -* H3) ** \[], \[])
     (\[], \[], H5 ** \[])
   xsimp_step_l verbose
-  check_goal
+  guard_target =
     XSimp
     ((H2 -* H3) ** H4 ** \[], \[], \[])
     (\[], \[], H5 ** \[])
@@ -431,12 +431,12 @@ If we have `(H2 ** H1) -* H3`, it should be canceled appropriately.
   xsimp_step_l
   xsimp_step_l
   xsimp_step_l
-  check_goal
+  guard_target =
     XSimp
     (H1 ** Q1 v ** \[], (Q1 -** Q2) ** \[], \[])
     (\[], \[], H2 ** \[])
   xsimp_step_l -- it cancels here
-  check_goal
+  guard_target =
     XSimp
     (\[], \[], (H1 ** \[]) ** Q2 v ** \[])
     (\[], \[], H2 ** \[])
@@ -455,17 +455,17 @@ If we have `(H2 ** H1) -* H3`, it should be canceled appropriately.
   xsimp_step_l
   xsimp_step_l
   xsimp_step_l
-  check_goal
+  guard_target =
     XSimp
     (H1 ** Q1 v ** \[], (Q1 -** Q2) ** \[], \[])
     (\[], \[], H2 ** \[])
   xsimp_step_l verbose -- use verbose mode to check the state
-  check_goal
+  guard_target =
     XSimp
     (Q1 v ** H1 ** \[], (Q1 -** Q2) ** \[], \[])
     (\[], \[], H2 ** \[])
   xsimp_step_l
-  check_goal
+  guard_target =
     XSimp
     (\[], \[], (H1 ** \[]) ** Q2 v ** \[])
     (\[], \[], H2 ** \[])

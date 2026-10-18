@@ -221,28 +221,28 @@ example {H1 H2 H3}:
 := by
   xsimp_start
   repeat xsimp_step_l
-  check_goal
+  guard_target =
     XSimp
     (H3 ** H2 ** \GC ** H1 ** \[], \[], \[])
     (\[], \[], (H1 ** \GC ** H2 ** H3) ** \[])
   xsimp_step_r
   xsimp_step_r
   xsimp_step_r
-  check_goal
+  guard_target =
     XSimp
     (H3 ** H2 ** \GC ** \[], \[], \[])
     (\[], \[], \GC ** (H2 ** H3) ** \[])
   xsimp_step_r
-  check_goal
+  guard_target =
     XSimp
     (H3 ** H2 ** \[], \[], \[])
     (\[], \GC ** \[], (H2 ** H3) ** \[])
   xsimp_step_r
-  check_goal
+  guard_target =
     XSimp (H3 ** H2 ** \[], \[], \[]) (\[], \GC ** \[], H2 ** H3 ** \[])
   xsimp_step_r
   xsimp_step_r
-  check_goal
+  guard_target =
     XSimp (\[], \[], \[]) (\[], \GC ** \[], \[])
   simp [XSimp]
 
@@ -254,10 +254,10 @@ example {H1 H2 H3}:
   xsimp_step_r
   xsimp_step_r
   xsimp_step_r
-  check_goal
+  guard_target =
     XSimp (H3 ** H1 ** \[], \[], \[]) (\[], \[], H1 ** H1 ** \[])
   xsimp_step_r
-  check_goal
+  guard_target =
     XSimp (H3 ** \[], \[], \[]) (\[], \[], H1 ** \[])
   xsimp_step_r
   sorry
@@ -268,7 +268,7 @@ example {H1 H2 H3 H4}:
   xsimp_start
   repeat xsimp_step_l
   repeat' xsimp_step_r
-  check_goal
+  guard_target =
     XSimp (\[], \[], \[]) (\[], \[], \[])
   simp [XSimp]
 
@@ -278,9 +278,9 @@ example {H1 H2 H3 H4}:
   xsimp_start
   repeat xsimp_step_l
   repeat' xsimp_step_r
-  . check_goal P
+  . guard_target = P
     sorry
-  . check_goal XSimp (H3 ** \[], \[], \[]) (H1 ** \[], \[], \[])
+  . guard_target = XSimp (H3 ** \[], \[], \[]) (H1 ** \[], \[], \[])
     sorry
 
 /-!
@@ -295,10 +295,10 @@ open Lang in
   repeat xsimp_step_l
   xsimp_step_r
   xsimp_step_r
-  . check_goal
+  . guard_target =
       XSimp (p ~~> 3 ** \[], \[], \[]) (p ~~> [slf| [?x] ] ** \[], \[], \[])
     sorry
-  . check_goal Int
+  . guard_target = Int
     sorry
 
 /-!
@@ -335,9 +335,9 @@ example {p}:
   xsimp_start
   repeat xsimp_step_l
   xsimp_step_r
-  check_goal XSimp (p ~~> 3 ** \[], \[], \[]) (\[], \[], p ~~> [slf| [?x] ] ** \[])
+  guard_target = XSimp (p ~~> 3 ** \[], \[], \[]) (\[], \[], p ~~> [slf| [?x] ] ** \[])
   xsimp_step_r
-  check_goal XSimp (\[], \[], \[]) (\[], \[], \[])
+  guard_target = XSimp (\[], \[], \[]) (\[], \[], \[])
   simp [XSimp]
 
 #try {p H1 H2}:
@@ -347,13 +347,13 @@ example {p}:
   repeat xsimp_step_l
   xsimp_step_r
   xsimp_step_r
-  check_goal
+  guard_target =
     XSimp (H1 ** p ~~> 3 ** \[], \[], \[]) (H2 ** \[], \[], (\∃ (n: Int), p ~~> [slf| [n] ]) ** \[])
   xsimp_step_r
-  check_goal
+  guard_target =
     XSimp (H1 ** p ~~> 3 ** \[], \[], \[]) (H2 ** \[], \[], p ~~> [slf| [?x] ] ** \[])
   xsimp_step_r
-  check_goal
+  guard_target =
     XSimp (H1 ** \[], \[], \[]) (H2 ** \[], \[], \[])
   sorry
 
@@ -363,9 +363,9 @@ example {p}:
   xsimp_start
   repeat xsimp_step_l
   repeat' xsimp_step_r
-  . check_goal n > 3
+  . guard_target = n > 3
     sorry
-  . check_goal
+  . guard_target =
       XSimp (H3 ** \[], \[], \[]) (H1 ** \[], \[], \[])
     sorry
 
@@ -378,7 +378,7 @@ example {H1 H2 H3}:
   xsimp_step_r
   xsimp_step_r
   xsimp_step_r
-  . check_goal 4 > 3
+  . guard_target = 4 > 3
     grind
   . grind
 
@@ -390,10 +390,10 @@ example {H1 H2 H3}:
   xsimp_step_r
   xsimp_step_r
   xsimp_step_r
-  . check_goal
+  . guard_target =
       XSimp (H1 ** \[], \[], \[]) (H2 ** \[], \[], ((p ~~> [slf| [?x] ] ** H3) ** H4) ** \[])
     sorry
-  . check_goal Int
+  . guard_target = Int
     sorry
 
 #try {H1 H2 H3 H4} {p}:
@@ -402,7 +402,7 @@ example {H1 H2 H3}:
   xsimp_start
   repeat xsimp_step_l
   repeat' xsimp_step_r
-  check_goal
+  guard_target =
     XSimp (H1 ** \[], \[], \[]) (H4 ** H3 ** H2 ** \[], \[], \[])
   sorry
 
@@ -418,9 +418,9 @@ example {H1 H2 H3}:
   xsimp_step_r
   xsimp_step_r
   xsimp_step_r
-  . check_goal ((3: Int) > 0)
+  . guard_target =~ ((3: Int) > 0)
     sorry
-  . check_goal
+  . guard_target =
       XSimp (H1 ** \[], \[], \[]) (H2 ** \[], \[], H4 ** \[])
     sorry
 

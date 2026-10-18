@@ -59,15 +59,15 @@ example {H1 H2 H3 H4}:
   H1 ==> H4
 := by
   intro M1 M2 M3
-  check_goal H1 ==> H4
+  guard_target = H1 ==> H4
   himp_change_lhs H2 := M1
-  check_goal H2 ==> H4
+  guard_target = H2 ==> H4
 
-  check_decl M2: H2 ==> H3
+  guard_hyp M2: H2 ==> H3
   himp_change_rhs _ at M2 := M3
-  check_goal H2 ==> H4
+  guard_target = H2 ==> H4
 
-  check_goal H2 ==> H4
+  guard_target = H2 ==> H4
   exact M2
 
 
@@ -268,7 +268,7 @@ scoped elab "xsimpl_handle_qimpl" : tactic => withMainContext do
 := by
   have h := Nat
   xsimpl_handle_qimpl
-  check_goal P () ==> Q ()
+  guard_target = P () ==> Q ()
   sorry
 
 #try (P Q: HProp):
@@ -276,9 +276,9 @@ scoped elab "xsimpl_handle_qimpl" : tactic => withMainContext do
 := by
   have h := Nat
   xsimpl_handle_qimpl
-  . check_goal (P ==> Q)
+  . guard_target = P ==> Q
     sorry
-  . check_goal (Q ==> P)
+  . guard_target = Q ==> P
     sorry
 
 #try (P Q: Nat → HProp):
@@ -287,10 +287,10 @@ scoped elab "xsimpl_handle_qimpl" : tactic => withMainContext do
   have h := Nat
   xsimpl_handle_qimpl
   . rename_i x
-    check_goal (P x ==> Q x)
+    guard_target = (P x ==> Q x)
     sorry
   . rename_i x
-    check_goal (Q x ==> P x)
+    guard_target = (Q x ==> P x)
     sorry
 
 scoped macro "xsimp_start" : tactic => `(tactic|
@@ -306,7 +306,7 @@ example {H1 H2 H3 H4}:
   H1 ** H2 ** H3 ** H4 ==> (H1 ** H4) ** (H2 ** H3)
 := by
   xsimp_start
-  check_goal
+  guard_target =
     XSimp
     (\[], \[], (H1 ** H2 ** H3 ** H4) ** \[])
     (\[], \[], ((H1 ** H4) ** H2 ** H3) ** \[])
@@ -521,27 +521,27 @@ example:
 := by
   let h := 1
   xsimp_hint_put true, _, 3
-  check_decl xsimp_hint := xhint[true, _, 3]
+  guard_hyp xsimp_hint :=~ xhint[true, _, 3]
   xsimp_hint_put 4, 6
-  check_decl xsimp_hint := xhint[true, _, 3, 4, 6]
+  guard_hyp xsimp_hint :=~ xhint[true, _, 3, 4, 6]
   xsimp_hint_next x => skip
-  check_decl xsimp_hint := xhint[_, 3, 4, 6]
+  guard_hyp xsimp_hint :=~ xhint[_, 3, 4, 6]
   xsimp_hint_next x => skip  -- we are able to detect holes
   xsimp_hint_next _ => skip  -- we don't need the value
-  check_decl xsimp_hint := xhint[4, 6]
+  guard_hyp xsimp_hint :=~ xhint[4, 6]
   xsimp_hint_next => skip  -- or omit the variable entirely
   xsimp_hint_next => skip
   -- the hint is empty now
-  check_decl xsimp_hint := xhint[]
+  guard_hyp xsimp_hint :=~ xhint[]
   fail_if_success xsimp_hint_next x => skip
   fail_if_success xsimp_has_next
   xsimp_hint_put 3
   xsimp_has_next  -- next hint is not empty
-  check_decl xsimp_hint := xhint[3]
-  check_goal ∃ n, n = 3
+  guard_hyp xsimp_hint :=~ xhint[3]
+  guard_target = ∃ n, n = 3
   xsimp_hint_next x => apply Exists.intro x
-  check_decl xsimp_hint := xhint[]
-  check_goal 3 = 3
+  guard_hyp xsimp_hint := xhint[]
+  guard_target = 3 = 3
   xsimp_hint_clear
   rfl
 
