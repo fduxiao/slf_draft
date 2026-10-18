@@ -107,6 +107,7 @@ def HProp.exists {α} (Q: α → HProp): HProp :=
 def HProp.forall {α} (Q: α → HProp): HProp :=
   fun h => ∀ a, Q a h
 
+open Lean TSyntax.Compat
 -- notations
 scoped notation "\\[]" => HProp.empty
 scoped notation:68 p " ~~> " v:68 => HProp.single p v
@@ -125,31 +126,33 @@ macro_rules
 
 scoped syntax "\\∃[" term "]": term
 scoped syntax "\\∀[" term "]": term
-scoped syntax:59 "\\∃ " binder+ ", " term:51: term
-scoped syntax:59 "\\∀ " binder+ ", " term:51: term
+scoped syntax:59 "\\∃ " explicitBinders", " term:51: term
+scoped syntax:59 "\\∀ " explicitBinders ", " term:51: term
 macro_rules
   | `(\∃[ $a ]) => `(HProp.exists $a)
-  | `(\∃ $b, $Q) => `(HProp.exists ([fun $b | $Q]))
-  | `(\∃ $b $[$b']*, $Q) => `(HProp.exists ([fun $b | \∃ $[$b']*, $Q]))
+  | `(\∃ $b, $Q) => expandExplicitBinders ``HProp.exists b Q
   | `(\∀[ $a ]) => `(HProp.forall $a)
-  | `(\∀ $b, $Q) => `(HProp.forall ([fun $b | $Q]))
-  | `(\∀ $b $[$b']*, $Q) => `(HProp.forall ([fun $b | \∀ $[$b']*, $Q]))
+  | `(\∀ $b, $Q) => expandExplicitBinders ``HProp.forall b Q
 
 
 @[app_unexpander HProp.exists]
 def HProp.exists.unexpander : Lean.PrettyPrinter.Unexpander
   | `($_ fun $x:ident => $Q) =>
     match Q with
-    | `(\∃ $y*, $Q') => `(\∃ $x:ident $y*, $Q')
+    | `(\∃ $[$y:ident]*, $Q') => `(\∃ $x:ident $[$y:ident]*, $Q')
     | _ => `(\∃ $x:ident, $Q)
   | _ => throw ()
 
+#try {p q H1}:
+  H1 ==> \∃ (n m: Int), (p ~~> n ** q ~~> m)
+:= by
+  sorry
 
 @[app_unexpander HProp.forall]
 def HProp.forall.unexpander : Lean.PrettyPrinter.Unexpander
   | `($_ fun $x:ident => $Q) =>
     match Q with
-    | `(\∀ $y*, $Q') => `(\∀ $x:ident $y*, $Q')
+    | `(\∀ $[$y:ident]*, $Q') => `(\∀ $x:ident $[$y:ident]*, $Q')
     | _ => `(\∀ $x:ident, $Q)
   | _ => throw ()
 
@@ -170,6 +173,10 @@ example (H1: Nat → HProp):
   rfl
 example (H1: Nat -> Nat → HProp):
   \∃ n1 n2, H1 n1 n2 = \∃ n1, \∃ n2, H1 n1 n2
+:= by
+  rfl
+example (H1: Nat -> Nat → HProp):
+  \∃ (n1 n2: Nat), H1 n1 n2 = \∃ n1: Nat, \∃ n2: Nat, H1 n1 n2
 := by
   rfl
 example (H1: Nat → HProp) (H2: HProp):
