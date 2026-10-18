@@ -332,13 +332,24 @@ scoped elab "xsimp_hook_single" _t:term: tactic => withMainContext do
     match e with
     | none => throwError m!"no matching HProp found for {H}"
     | some h =>
-      let t ← changeHla h
-      evalTactic (← `(tactic| $t <;> apply XSimp.lr_cancel_eq (by xsimp_cancel_by_eq)))
+      evalTactic <| ← changeHla h
+      evalTactic <| ← `(tactic|
+          first | apply XSimp.lr_cancel_eq <;> try xsimp_cancel_by_eq
+        )
   | _ =>
     throwError m!"not a p ~~> v: {H}"
 
 scoped macro_rules
   | `(tactic| xsimp_hook $t) => `(tactic| xsimp_hook_single $t)
+
+example {p} {n: Int}:
+  XSimp (p ~~> n ** \[], \[], \[]) (\[], \[], p ~~> (n - 1 + 1: Int) ** \[])
+:= by
+  xsimp_step_r
+  . guard_target = n = n - 1 + 1
+    lia
+  . guard_target = XSimp (\[], \[], \[]) (\[], \[], \[])
+    simp [XSimp]
 
 example {p}:
   p ~~> 3 ==> \∃ (n:Int), p ~~> n
