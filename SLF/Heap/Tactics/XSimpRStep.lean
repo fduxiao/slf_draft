@@ -190,9 +190,20 @@ scoped elab "xsimp_step_r_core": tactic => withMainContext do
           let stx ← delabNoPP H
           `(tactic | first | xsimp_hook $stx | apply XSimp.right_keep)
     | ~q(HProp.exists $P) =>
+      let boundVar: TSyntax `term ←
+        if P.isLambda then
+            let x := P.bindingName!
+            let i := Lean.mkIdent x
+            `(term| ?$i)
+        else
+          `(?_)
       let hintValue ← popXSimpHintSkipHole?
       match hintValue with
-      | none => `(tactic| apply XSimp.right_exists)
+      | none =>
+        if P.isLambda then
+          `(tactic| first | apply XSimp.right_exists (x := $boundVar) | apply XSimp.right_exists (x := ?_))
+        else
+          `(tactic| first | apply XSimp.right_exists)
       | some v =>
         -- This `v` should be put with notations
         let stx ← PrettyPrinter.delab v
@@ -296,7 +307,7 @@ open Lang in
   xsimp_step_r
   xsimp_step_r
   . guard_target =
-      XSimp (p ~~> 3 ** \[], \[], \[]) (p ~~> [slf| [?x] ] ** \[], \[], \[])
+      XSimp (p ~~> 3 ** \[], \[], \[]) (p ~~> [slf| [?n] ] ** \[], \[], \[])
     sorry
   . guard_target = Int
     sorry
@@ -335,7 +346,7 @@ example {p}:
   xsimp_start
   repeat xsimp_step_l
   xsimp_step_r
-  guard_target = XSimp (p ~~> 3 ** \[], \[], \[]) (\[], \[], p ~~> [slf| [?x] ] ** \[])
+  guard_target = XSimp (p ~~> 3 ** \[], \[], \[]) (\[], \[], p ~~> [slf| [?n] ] ** \[])
   xsimp_step_r
   guard_target = XSimp (\[], \[], \[]) (\[], \[], \[])
   simp [XSimp]
@@ -351,7 +362,7 @@ example {p}:
     XSimp (H1 ** p ~~> 3 ** \[], \[], \[]) (H2 ** \[], \[], (\∃ (n: Int), p ~~> [slf| [n] ]) ** \[])
   xsimp_step_r
   guard_target =
-    XSimp (H1 ** p ~~> 3 ** \[], \[], \[]) (H2 ** \[], \[], p ~~> [slf| [?x] ] ** \[])
+    XSimp (H1 ** p ~~> 3 ** \[], \[], \[]) (H2 ** \[], \[], p ~~> [slf| [?n] ] ** \[])
   xsimp_step_r
   guard_target =
     XSimp (H1 ** \[], \[], \[]) (H2 ** \[], \[], \[])
@@ -395,7 +406,7 @@ example {H1 H2 H3}:
   xsimp_step_r
   guard_hyp xsimp_hint := xhint[]
   xsimp_step_r
-  . guard_target = ?x > 3
+  . guard_target = ?n > 3
     show 4 > 3
     grind
   . grind
@@ -421,7 +432,7 @@ example {H1 H2 H3}:
   xsimp_start
   repeat' xsimp_step_l
   repeat' xsimp_step_r
-  . guard_target = ?x = 3
+  . guard_target = ?m = 3
     show 3 = 3
     lia
   . guard_target = 2 = 2
@@ -437,8 +448,11 @@ example {H1 H2 H3}:
   repeat' xsimp_step_l
   repeat' xsimp_step_r
   . clear xsimp_hint
+    guard_target =
+      XSimp (H1 ** \[], \[], \[]) (q ~~> [slf| 2 ] ** p ~~> [slf| [_] ] ** \[], \[], \[])
     sorry
   . sorry
+
 
 #try {H1 H2 H3 H4 p}:
   H1 ==> H2 ** \∃ (n: Int), (p ~~> n ** H3) ** H4
@@ -449,7 +463,7 @@ example {H1 H2 H3}:
   xsimp_step_r
   xsimp_step_r
   . guard_target =
-      XSimp (H1 ** \[], \[], \[]) (H2 ** \[], \[], ((p ~~> [slf| [?x] ] ** H3) ** H4) ** \[])
+      XSimp (H1 ** \[], \[], \[]) (H2 ** \[], \[], ((p ~~> [slf| [?n] ] ** H3) ** H4) ** \[])
     sorry
   . guard_target = Int
     sorry
