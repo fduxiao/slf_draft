@@ -253,7 +253,7 @@ scoped elab "xsimpl_handle_qimpl" : tactic => withMainContext do
     else if ← isDefEq α (Expr.const ``Unit []) then
       evalTactic (← `(tactic| rw [HProp.qimp_unit]))
     else
-      evalTactic (← `(tactic| intro _))
+      evalTactic (← `(tactic| intro _ <;> unfold HProp.qstar))
   | ~q($lhs ==> $rhs) =>
     if rhs.isMVar then
       evalTactic (← `(tactic| apply HProp.imp_refl))
@@ -269,6 +269,15 @@ scoped elab "xsimpl_handle_qimpl" : tactic => withMainContext do
   have h := Nat
   xsimpl_handle_qimpl
   guard_target = P () ==> Q ()
+  sorry
+
+#try {Q1 Q2: Nat → HProp} {H2 H3}:
+  Q1 *+ H2 ===> Q2 *+ H2 *+ H3
+:= by
+  xsimpl_handle_qimpl
+  guard_target = Q1 _ ** H2 ==> (Q2 _ ** H2) ** H3
+  rename_i x
+  guard_target = Q1 x ** H2 ==> (Q2 x ** H2) ** H3
   sorry
 
 #try (P Q: HProp):
