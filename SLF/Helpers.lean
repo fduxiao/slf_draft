@@ -66,6 +66,125 @@ def delabNoPP (e: Expr): MetaM Term := do
   withOptions (fun opts => opts.setBool `pp.all true) do
     PrettyPrinter.delab e
 end DelabNoPP
+section TacticMark
+
+open Lean Elab Tactic Meta Term
+
+inductive TacticMark where
+  | mark
+deriving Repr, Nonempty, Inhabited
+
+macro "tactic_mark" : tactic => `(tactic| have tactic_mark: TacticMark := TacticMark.mark)
+
+def declAfterMark: MetaM (Array (LocalDecl)) := do
+  let mut started := false
+  let mut result: Array LocalDecl := #[]
+  let ctx ← MonadLCtx.getLCtx -- get the local context.
+  for decl in ctx do
+    let declType := decl.type
+    -- check if the current declaration is a TacticMark
+    if ← isDefEq declType (mkConst ``TacticMark) then
+      started := true
+      continue
+    if not started then
+      continue
+    result := result.push decl
+  return result
+
+elab "revert_after_mark" : tactic => withMainContext do
+  let decls ← declAfterMark
+  liftMetaTactic <| fun mvarId => do
+    let ⟨_, mvarId⟩ ← mvarId.revert ( (fun decl => decl.fvarId) <$> decls)
+    return [mvarId]
+
+def Helpers.clear! (mvarId : MVarId) (fvarId : FVarId) : MetaM MVarId := do
+    mvarId.checkNotAssigned `clear_mark
+    let lctx ← getLCtx
+    unless lctx.contains fvarId do
+      throwTacticEx `clear_mark mvarId m!"unknown variable '{mkFVar fvarId}'"
+    let tag ← mvarId.getTag
+    let mvarDecl ← mvarId.getDecl
+    let lctx := lctx.erase fvarId
+    let localInsts ← getLocalInstances
+    let localInsts := match localInsts.findFinIdx? fun localInst => localInst.fvar.fvarId! == fvarId with
+      | none => localInsts
+      | some idx => localInsts.eraseIdx idx
+    let newMVar ← mkFreshExprMVarAt lctx localInsts mvarDecl.type MetavarKind.syntheticOpaque tag
+    mvarId.assign newMVar
+    pure newMVar.mvarId!
+
+elab "clear_mark!" : tactic => withMainContext do
+  let goal ← getMainGoal
+  let ctx ← MonadLCtx.getLCtx -- get the local context.
+  for decl in ctx do
+    let declType := decl.type
+    -- check if the current declaration is a TacticMark
+    if ! (← isDefEq declType (mkConst ``TacticMark)) then
+      continue
+    let goal ← Helpers.clear! goal decl.fvarId
+    replaceMainGoal [goal]
+
+elab "clear_mark" : tactic => withMainContext do
+  let goal ← getMainGoal
+  let ctx ← MonadLCtx.getLCtx -- get the local context.
+  let mut success := false
+  for decl in ctx do
+    let declType := decl.type
+    -- check if the current declaration is a TacticMark
+    if ! (← isDefEq declType (mkConst ``TacticMark)) then
+      continue
+    let goal ← goal.clear decl.fvarId
+    replaceMainGoal [goal]
+    success := true
+  if !success then
+    throwError "no TacticMark found"
+
+macro "clear_mark'" : tactic => `(tactic| repeat any_goals clear_mark)
+
+example {P Q R: Prop}:
+  P → Q → R → True
+:= by
+  tactic_mark
+  intros
+  guard_target = True
+  revert_after_mark
+  guard_target = (P → Q → R → True)
+  clear_mark!
+  intros
+  trivial
+
+-- Why do I need the `clear_mark` tactic? See the following.
+example:
+  (forall {x: Nat}, 0 ≤ x → False) → False
+:= by
+  have K: Unit := ()
+  intro H
+  apply H
+  . fail_if_success clear K
+    lia
+  . exact default
+
+example (n: Nat):
+  (forall {x: Nat}, 0 ≤ x → False) → False
+:= by
+  have h: TacticMark := TacticMark.mark
+  intro H
+  apply H <;> clear_mark! <;> revert n
+  . guard_target = ∀ (n : Nat), 0 ≤ _
+    lia
+  . exact default
+
+example:
+  (forall {x: Nat}, 0 ≤ x → False) → False
+:= by
+  have h: TacticMark := TacticMark.mark
+  intro H
+  apply H <;> clear_mark!
+  . guard_target = 0 ≤ ?x
+    lia
+  . exact default
+
+end TacticMark
 
 section Misc
 open Lean
@@ -74,12 +193,6 @@ def Lean.Expr.removeMData (e: Expr): Expr :=
   match e with
   | .mdata _ b => b.removeMData
   | _ => e
-
-inductive TacticMark where
-  | mark
-deriving Repr, Nonempty, Inhabited
-
-macro "tactic_mark" : tactic => `(tactic| have _: TacticMark := TacticMark.mark)
 
 declare_syntax_cat bool (behavior := symbol)
 syntax "true" : bool

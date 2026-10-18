@@ -232,6 +232,7 @@ scoped macro_rules
 `Protect` is a simple identity function that can be used to mark expressions
 that should be protected from `xsimp`.
 -/
+@[grind]
 def Protect {α} (x : α) : α := x
 
 end ProtectAndXSimpHook
