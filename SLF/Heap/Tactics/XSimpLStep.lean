@@ -245,10 +245,10 @@ scoped elab "xsimp_step_l_core" c:bool v:bool : tactic => withMainContext do
 
 syntax "xsimp_step_l" "verbose"? (bool)? : tactic
 macro_rules
-  | `(tactic| xsimp_step_l verbose $b) => `(tactic| xsimp_step_l_core $b true)
-  | `(tactic| xsimp_step_l $b:bool) => `(tactic| xsimp_step_l_core $b false)
-  | `(tactic| xsimp_step_l verbose) => `(tactic| xsimp_step_l_core true true)
-  | `(tactic| xsimp_step_l) => `(tactic| xsimp_step_l_core true false)
+  | `(tactic| xsimp_step_l verbose $b) => `(tactic| xsimp_step_l_core $b true <;> xsimp_hint_clear)
+  | `(tactic| xsimp_step_l $b:bool) => `(tactic| xsimp_step_l_core $b false <;> xsimp_hint_clear)
+  | `(tactic| xsimp_step_l verbose) => `(tactic| xsimp_step_l_core true true <;> xsimp_hint_clear)
+  | `(tactic| xsimp_step_l) => `(tactic| xsimp_step_l_core true false <;> xsimp_hint_clear)
 
 end XSimpLStepCore
 

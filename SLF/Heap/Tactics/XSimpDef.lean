@@ -406,7 +406,7 @@ def XHelpers.findXSimpHint?: MetaM (Option Q(XSimpHint)) := do
       return some decl.toExpr
   return none
 
-def XHelpers.clearXSimpHint: TacticM Unit := do
+def XHelpers.clearXSimpHint (mustSuccess: Bool := true): TacticM Unit := do
   let ctx ← MonadLCtx.getLCtx -- get the local context.
   let mut success := false
   for decl in ctx do
@@ -418,16 +418,22 @@ def XHelpers.clearXSimpHint: TacticM Unit := do
     liftMetaTactic fun mvarId => do
       let mvarId ← mvarId.clear decl.fvarId
       return [mvarId]
-  if !success then
+  if !success && mustSuccess then
     throwError "no XSimpHint found to clear"
 
 scoped elab "xsimp_hint_clear" : tactic => withMainContext do
+  let goal ← getMainGoal
+  let goal ← goal.getType
+  if ! goal.isAppOf ``XSimp then
+    XHelpers.clearXSimpHint (mustSuccess := false)
+
+scoped elab "xsimp_hint_clear_all" : tactic => withMainContext do
   XHelpers.clearXSimpHint
 
 def XHelpers.replaceXSimpHint (hint: Q(XSimpHint)): TacticM Unit := do
   let old ← XHelpers.findXSimpHint?
   if old.isSome then
-    evalTactic (← `(tactic| repeat all_goals xsimp_hint_clear))
+    clearXSimpHint
   else
     pure ()
   addXSimpHint hint

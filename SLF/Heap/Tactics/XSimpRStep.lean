@@ -211,7 +211,7 @@ scoped elab "xsimp_step_r_core": tactic => withMainContext do
       else
         `(tactic | first | xsimp_cancel_same $stx | xsimp_hook $stx | apply XSimp.right_keep)
 
-macro "xsimp_step_r" : tactic => `(tactic| xsimp_step_r_core)
+macro "xsimp_step_r" : tactic => `(tactic| xsimp_step_r_core <;> xsimp_hint_clear)
 end XSimpRStepCore
 
 section Examples
@@ -428,6 +428,17 @@ example {H1 H2 H3}:
     lia
   . guard_target = XSimp (\[], \[], \[]) (\[], \[], \[])
     simp [XSimp]
+
+#try {H1 p q}:
+  H1 ==> \∃ (n m: Int), (p ~~> n ** q ~~> m)
+:= by
+  xsimp_hint_put _, 2
+  xsimp_start
+  repeat' xsimp_step_l
+  repeat' xsimp_step_r
+  . clear xsimp_hint
+    sorry
+  . sorry
 
 #try {H1 H2 H3 H4 p}:
   H1 ==> H2 ** \∃ (n: Int), (p ~~> n ** H3) ** H4
