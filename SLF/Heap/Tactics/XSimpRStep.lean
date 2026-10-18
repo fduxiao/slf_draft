@@ -190,7 +190,7 @@ scoped elab "xsimp_step_r_core": tactic => withMainContext do
           let stx ← delabNoPP H
           `(tactic | first | xsimp_hook $stx | apply XSimp.right_keep)
     | ~q(HProp.exists $P) =>
-      let hintValue ← hasNextHint
+      let hintValue ← popXSimpHintSkipHole?
       match hintValue with
       | none => `(tactic| apply XSimp.right_exists)
       | some v =>
@@ -376,11 +376,58 @@ example {H1 H2 H3}:
   xsimp_start
   repeat xsimp_step_l
   xsimp_step_r
+  guard_hyp xsimp_hint := xhint[4]
   xsimp_step_r
+  guard_hyp xsimp_hint := xhint[]
   xsimp_step_r
   . guard_target = 4 > 3
     grind
   . grind
+
+example {H1 H2 H3}:
+  H1 ** H2 ** H3 ==> (\∃ n: Nat, \[n > 3]) ** H2 ** H1 ** H3
+:= by
+  xsimp_hint_put _
+  xsimp_start
+  repeat xsimp_step_l
+  xsimp_step_r
+  guard_hyp xsimp_hint := xhint[_]
+  xsimp_step_r
+  guard_hyp xsimp_hint := xhint[]
+  xsimp_step_r
+  . guard_target = ?x > 3
+    show 4 > 3
+    grind
+  . grind
+
+example {H1 H2 H3}:
+  H1 ** H2 ** H3 ==> (\∃ m n: Nat, \[m = 3] ** \[n = 2]) ** H2 ** H1 ** H3
+:= by
+  xsimp_hint_put 3, 2
+  xsimp_start
+  repeat' xsimp_step_l
+  repeat' xsimp_step_r
+  . guard_target = 3 = 3
+    lia
+  . guard_target = 2 = 2
+    lia
+  . guard_target = XSimp (\[], \[], \[]) (\[], \[], \[])
+    simp [XSimp]
+
+example {H1 H2 H3}:
+  H1 ** H2 ** H3 ==> (\∃ m n: Nat, \[m = 3] ** \[n = 2]) ** H2 ** H1 ** H3
+:= by
+  xsimp_hint_put _, 2
+  xsimp_start
+  repeat' xsimp_step_l
+  repeat' xsimp_step_r
+  . guard_target = ?x = 3
+    show 3 = 3
+    lia
+  . guard_target = 2 = 2
+    lia
+  . guard_target = XSimp (\[], \[], \[]) (\[], \[], \[])
+    simp [XSimp]
 
 #try {H1 H2 H3 H4 p}:
   H1 ==> H2 ** \∃ (n: Int), (p ~~> n ** H3) ** H4

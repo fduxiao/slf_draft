@@ -408,14 +408,18 @@ def XHelpers.findXSimpHint?: MetaM (Option Q(XSimpHint)) := do
 
 def XHelpers.clearXSimpHint: TacticM Unit := do
   let ctx ← MonadLCtx.getLCtx -- get the local context.
+  let mut success := false
   for decl in ctx do
     let declType := decl.type -- Find the type of the declaration.
     if declType != q(XSimpHint) then
       continue
     -- clear the decl
+    success := true
     liftMetaTactic fun mvarId => do
       let mvarId ← mvarId.clear decl.fvarId
       return [mvarId]
+  if !success then
+    throwError "no XSimpHint found to clear"
 
 scoped elab "xsimp_hint_clear" : tactic => withMainContext do
   XHelpers.clearXSimpHint
@@ -423,7 +427,7 @@ scoped elab "xsimp_hint_clear" : tactic => withMainContext do
 def XHelpers.replaceXSimpHint (hint: Q(XSimpHint)): TacticM Unit := do
   let old ← XHelpers.findXSimpHint?
   if old.isSome then
-    clearXSimpHint
+    evalTactic (← `(tactic| repeat all_goals xsimp_hint_clear))
   else
     pure ()
   addXSimpHint hint
@@ -469,6 +473,22 @@ def XHelpers.popXSimpHint?: TacticM (Option Q(Box)) := do
     let xs: Q(XSimpHint) := xs
     replaceXSimpHint xs
     return (some x)
+
+def XHelpers.popXSimpHintSkipHole?: TacticM (Option Q(Box)) := do
+  let hint ← XHelpers.findXSimpHint?
+  if hint.isNone then
+    return none
+  let hint := hint.get!
+  match hint with
+  | ~q([]) => return none
+  | ~q(($x :: $xs)) =>
+    -- set decl to the rest of the hint
+    let xs: Q(XSimpHint) := xs
+    replaceXSimpHint xs
+    if ← Box.isHoleQ x then
+      return none
+    else
+      return (some x)
 
 def XHelpers.popXSimpHint!: TacticM Q(Box) := do
   let hint ← XHelpers.findXSimpHint!
