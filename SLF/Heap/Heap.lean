@@ -796,6 +796,41 @@ theorem HProp.affine_empty:
 by
   simp [HProp.affine]
 
+@[simp, grind .]
+theorem HProp.affine_pure {P}:
+  HProp.affine \[P]
+:= by
+  grind
+
+@[simp, grind .]
+theorem HProp.affine_star {H1 H2}:
+  HProp.affine H1 →
+  HProp.affine H2 →
+  HProp.affine (H1 ** H2)
+:= by
+  grind
+
+@[simp, grind .]
+theorem HProp.affine_exists {α} {J:α → HProp}:
+  (∀ x, HProp.affine (J x)) →
+  HProp.affine (\∃ x, (J x))
+:= by
+  grind
+
+@[simp, grind .]
+theorem HProp.affine_forall {α} {J:α → HProp}:
+  (∀ x, HProp.affine (J x)) →
+  HProp.affine (\∀ x, (J x))
+:= by
+  grind
+
+@[simp, grind .]
+theorem HProp.affine_star_pure {P H}:
+  (P → HProp.affine H) →
+  HProp.affine (\[P] ** H)
+:= by
+  grind
+
 section GC
 
 @[grind]
