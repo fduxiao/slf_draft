@@ -58,6 +58,20 @@ theorem HProp.imp_antisym {H1 H2: HProp}:
   . exact h12
   . exact h21
 
+@[grind .]
+theorem HProp.imp_mp {H1 H2: HProp}:
+  H1 = H2 →
+  H1 ==> H2
+:= by
+  grind
+
+@[grind .]
+theorem HProp.imp_mpr {H1 H2: HProp}:
+  H1 = H2 →
+  H2 ==> H1
+:= by
+  grind
+
 @[symm]
 theorem HProp.imp_op_comm {op: HProp → HProp → HProp}:
   (∀ H1 H2, op H1 H2 ==> op H2 H1) →

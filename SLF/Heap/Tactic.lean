@@ -5,6 +5,7 @@ import SLF.Heap.Tactics.XSimpDef
 import SLF.Heap.Tactics.XSimpLStep
 import SLF.Heap.Tactics.XSimpRStep
 import SLF.Heap.Tactics.XSimp
+import SLF.Heap.Tactics.XChange
 
 /-!
 # How does the xsimp tactic work?

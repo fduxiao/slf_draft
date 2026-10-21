@@ -208,4 +208,18 @@ def interpBool (stx: TSyntax `bool): Bool :=
   | `(bool| false) => false
   | _ => false
 
+declare_syntax_cat dir (behavior := symbol)
+syntax "←" : dir
+syntax "<-" : dir
+syntax "→" : dir
+syntax "->" : dir
+def interpDir (stx: TSyntax `dir): Bool :=
+  match stx with
+  | `(dir| ←) => false
+  | `(dir| <-) => false
+  | `(dir| →) => true
+  | `(dir| ->) => true
+  | _ => true
+
+
 end Misc
