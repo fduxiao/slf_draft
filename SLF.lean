@@ -5,4 +5,5 @@ import SLF.Map
 import SLF.Lang
 import SLF.Heap
 import SLF.Semantics
+import SLF.Triple
 import SLF.Basic

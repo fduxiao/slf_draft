@@ -1,17 +1,20 @@
 import SLF.Lang
 import SLF.Heap
 
-namespace SLF.Lang
-open Map Heap
+namespace SLF
+open Lang Map Heap
 
 section Substitution
-def Term.isValue : Term → Bool
+
+@[grind]
+def Lang.Term.isValue : Term → Bool
   | Term.val _ => true
   | _ => false
 
 
 /-- Substitution for terms -/
-def Term.subst (y: Var) (v: Val) (t: Term): Term :=
+@[grind]
+def Lang.Term.subst (y: Var) (v: Val) (t: Term): Term :=
   match t with
   | .val v' => .val v'
   | .var x => if x = y then (.val v) else t
@@ -28,6 +31,7 @@ section SmallStep
 /-!
 ## Small-step semantics of the language
 -/
+@[grind]
 inductive Step: Heap → Term → Heap → Term → Prop where
   -- Context rules
   | seq_ctx {s1 s2 t1 t1' t2}:
@@ -39,7 +43,7 @@ inductive Step: Heap → Term → Heap → Term → Prop where
   | app_arg1 {s1 s2 t1 t1' t2}:
       Step s1 t1 s2 t1' →
       Step s1 (.app t1 t2) s2 (.app t1' t2)
-  | app_arg2 {s1 s2 v1 t2 t2'}:
+  | app_arg2 {s1 s2} {v1: Val} {t2 t2'}:
       Step s1 t2 s2 t2' →
       Step s1 (.app v1 t2) s2 (.app v1 t2')
   -- Reductions
@@ -95,22 +99,22 @@ inductive Step: Heap → Term → Heap → Term → Prop where
       Step s [slf| [n1] > [n2] ] s [slf| [decide (n1 > n2)] ]
   | ptr_add {s} {p1 p2: Loc} {n: Int}:
       p2.toInt = (p1 + n).toInt →
-      Step s [slf| [.loc p1] +> [n] ] s [slf| [.loc p2] ]
+      Step s [slf| [p1] +> [n] ] s [slf| [p2] ]
   -- Heap operations
   | ref {s: Heap} {p: Loc} {v: Val}:
       ¬ p ∈ s →
       Step s [slf| ref [v] ] (s[ p => v ]) [slf| [p] ]
   | get {s: Heap} {p: Loc}:
       p ∈ s →
-      Step s [slf| get [p] ] s s[p]!
+      Step s [slf| ![p] ] s s[p]!
   | set {s: Heap} {p: Loc} {v: Val}:
       p ∈ s →
-      Step s [slf| set [p] [v] ] (s[p => v]) [slf| val_unit]
+      Step s [slf| [p] := [v] ] (s[p => v]) [slf| unit ]
   | free {s: Heap} {p: Loc}:
       p ∈ s →
-      Step s [slf| free [p] ] (s ÷ p) [slf| val_unit]
+      Step s [slf| free [p] ] (s ÷ p) [slf| unit ]
 
-
+@[grind]
 inductive MStep: Heap → Term → Heap → Term → Prop where
   | refl {s t}: MStep s t s t
   | step {s1 s2 s3 t1 t2 t3}:
@@ -118,7 +122,7 @@ inductive MStep: Heap → Term → Heap → Term → Prop where
       MStep s2 t2 s3 t3 →
       MStep s1 t1 s3 t3
 
-
+@[grind .]
 theorem MStep.ofStep {s1 s2 t1 t2}:
   Step s1 t1 s2 t2 →
   MStep s1 t1 s2 t2
@@ -131,7 +135,7 @@ theorem MStep.ofStep {s1 s2 t1 t2}:
 instance (s1 t1 s2 t2): Coe (Step s1 t1 s2 t2) (MStep s1 t1 s2 t2) where
   coe := MStep.ofStep
 
-
+@[grind .]
 theorem MStep.trans {s1 s2 s3 t1 t2 t3}:
   MStep s1 t1 s2 t2 →
   MStep s2 t2 s3 t3 →
@@ -147,22 +151,284 @@ theorem MStep.trans {s1 s2 s3 t1 t2 t3}:
     . exact H11'
     . exact IH
 
-
-def Term.reducible (s: Heap) (t: Term): Prop :=
+@[grind]
+def Reduciable (s: Heap) (t: Term): Prop :=
   ∃ s' t', Step s t s' t'
 
+@[simp, grind .]
+theorem Step.reduciable {s t s' t'}:
+  Step s t s' t' →
+  Reduciable s t
+:= by
+  intro H
+  exists s', t'
 
-def Term.nonstuck (s: Heap) (t: Term): Prop :=
-  t.isValue ∨ Term.reducible s t
+@[grind]
+def NonStuck (s: Heap) (t: Term): Prop :=
+  t.isValue ∨ Reduciable s t
+
+@[simp, grind .]
+theorem NonStuck.ofValue {s} {v: Val}: NonStuck s (.val v) := by grind
 
 end SmallStep
-section OmniBigStep
+section ReducibleTerms
+@[simp]
+theorem Val.irreducible {v s}:
+  Reduciable s (.val v) ↔ False
+:= by
+  grind
 
+@[simp, grind .]
+theorem Term.fun_reduciable {s x t1}:
+  Reduciable s (.fun x t1)
+:= by
+  exists s, (Val.fun x t1)
+  constructor
+
+@[simp, grind .]
+theorem Term.fix_reduciable {s f x t1}:
+  Reduciable s (.fix f x t1)
+:= by
+  exists s, (Val.fix f x t1)
+  constructor
+
+@[simp, grind .]
+theorem Term.app_ctx1_reduciable {s t1 t2}:
+  Reduciable s t1 →
+  Reduciable s (.app t1 t2)
+:= by
+  rintro ⟨s', t', H⟩
+  exists s', (.app t' t2)
+  grind
+
+@[simp, grind .]
+theorem Term.app_ctx2_reduciable {s} {v: Val} {t2}:
+  Reduciable s t2 →
+  Reduciable s (.app (.val v) t2)
+:= by
+  rintro ⟨s', t', H⟩
+  exists s', (.app (.val v) t')
+  grind
+
+@[simp, grind .]
+theorem Term.app_fun_reduciable {s x t1 v}:
+  Reduciable s (.app (Val.fun x t1) (.val v))
+:= by
+  exists s, t1.subst x v
+  grind
+
+@[simp, grind .]
+theorem Term.app_fix_reduciable {s f x t1 v}:
+  Reduciable s (.app (Val.fix f x t1) (.val v))
+:= by
+  exists s, ((t1.subst f (Val.fix f x t1)).subst x v)
+  grind
+
+@[simp, grind .]
+theorem Term.seq_ctx_reduciable {s t1 t2}:
+  Reduciable s t1 →
+  Reduciable s (.seq t1 t2)
+:= by
+  rintro ⟨s', t', H⟩
+  exists s', (.seq t' t2)
+  grind
+
+@[simp, grind .]
+theorem Term.seq_val_reduciable {s v t2}:
+  Reduciable s (.seq (.val v) t2)
+:= by
+  exists s, t2
+  grind
+
+@[simp, grind .]
+theorem Term.let_val_reduciable {s x v t2}:
+  Reduciable s (.let x (.val v) t2)
+:= by
+  exists s, (t2.subst x v)
+  constructor
+
+@[simp, grind .]
+theorem Term.let_ctx_reduciable {s x t1 t2}:
+  Reduciable s t1 →
+  Reduciable s (.let x t1 t2)
+:= by
+  rintro ⟨s', t', H⟩
+  exists s', (.let x t' t2)
+  grind
+
+@[simp, grind .]
+theorem Term.if_reduciable {s} {b: Bool} {t1 t2}:
+  Reduciable s (Term.if b t1 t2)
+:= by
+  exists s, (if b then t1 else t2)
+  constructor
+
+end ReducibleTerms
+
+section ReducibleUnOp
+
+@[simp, grind .]
+theorem Term.neg_reduciable {s} {b: Bool}:
+  Reduciable s [slf| not [b] ]
+:= by
+  exists s, (Val.bool (!b))
+  grind
+
+@[simp, grind .]
+theorem Term.opp_reduciable {s} {n: Int}:
+  Reduciable s [slf| - [n] ]
+:= by
+  exists s, (Val.int (- n))
+  constructor
+
+@[simp, grind .]
+theorem Term.rand_reduciable {s} {n: Int} (h: 0 < n):
+  Reduciable s [slf| rand [n] ]
+:= by
+  exists s, (Val.int 0) -- placeholder, actual value depends on the semantics of rand
+  grind
+end ReducibleUnOp
+
+section ReducibleBinOp
+section Arithmetic
+
+@[simp, grind .]
+theorem Term.add_reduciable {s} {n1 n2: Int}:
+  Reduciable s [slf| [n1] + [n2] ]
+:= by
+  exists s, (Val.int (n1 + n2))
+  grind
+
+@[simp, grind .]
+theorem Term.sub_reduciable {s} {n1 n2: Int}:
+  Reduciable s [slf| [n1] - [n2] ]
+:= by
+  exists s, (Val.int (n1 - n2))
+  constructor
+
+@[simp, grind .]
+theorem Term.mul_reduciable {s} {n1 n2: Int}:
+  Reduciable s [slf| [n1] * [n2] ]
+:= by
+  exists s, (Val.int (n1 * n2))
+  grind
+
+@[simp, grind .]
+theorem Term.div_reduciable {s} {n1 n2: Int} (h: n2 ≠ 0):
+  Reduciable s [slf| [n1] / [n2] ]
+:= by
+  exists s, (Val.int (n1 / n2))
+  grind
+
+@[simp, grind .]
+theorem Term.mod_reduciable {s} {n1 n2: Int} (h: n2 ≠ 0):
+  Reduciable s [slf| [n1] % [n2] ]
+:= by
+  exists s, (Val.int (n1 % n2))
+  grind
+
+end Arithmetic
+
+section Comparison
+
+@[simp, grind .]
+theorem Term.eq_reduciable {s} {v1 v2: Val}:
+  Reduciable s [slf| [v1] == [v2] ]
+:= by
+  exists s, (Val.bool (v1 == v2))
+  constructor
+
+@[simp, grind .]
+theorem Term.neq_reduciable {s} {v1 v2: Val}:
+  Reduciable s [slf| [v1] != [v2] ]
+:= by
+  exists s, (Val.bool (v1 != v2))
+  constructor
+
+@[simp, grind .]
+theorem Term.le_reduciable {s} {n1 n2: Int}:
+  Reduciable s [slf| [n1] <= [n2] ]
+:= by
+  exists s, (Val.bool (decide (n1 ≤ n2)))
+  constructor
+
+@[simp, grind .]
+theorem Term.lt_reduciable {s} {n1 n2: Int}:
+  Reduciable s [slf| [n1] < [n2] ]
+:= by
+  exists s, (Val.bool (decide (n1 < n2)))
+  constructor
+
+@[simp, grind .]
+theorem Term.ge_reduciable {s} {n1 n2: Int}:
+  Reduciable s [slf| [n1] >= [n2] ]
+:= by
+  exists s, (Val.bool (decide (n1 ≥ n2)))
+  constructor
+
+@[simp, grind .]
+theorem Term.gt_reduciable {s} {n1 n2: Int}:
+  Reduciable s [slf| [n1] > [n2] ]
+:= by
+  exists s, (Val.bool (decide (n1 > n2)))
+  constructor
+
+end Comparison
+
+@[simp, grind .]
+theorem Term.ptr_add_reduciable {s} {p1 p2: Loc} {n: Int} (h: p2.toInt = (p1 + n).toInt):
+  Reduciable s [slf| [p1] +> [n] ]
+:= by
+  exists s, p2
+  constructor
+  assumption
+
+end ReducibleBinOp
+
+section ReducibleMemOp
+
+@[simp, grind .]
+theorem Term.ref_reduciable {s} {v: Val}:
+  Reduciable s [slf| ref [v] ]
+:= by
+  obtain ⟨p, H⟩ := s.exists_refresh (null := 0)
+  exists s[p => v], (Val.loc p)
+  constructor
+  exact H.left
+
+@[simp, grind .]
+theorem Term.get_reduciable {s} {p: Loc} (h: p ∈ s):
+  Reduciable s [slf| ![p] ]
+:= by
+  exists s, s[p]!
+  constructor
+  exact h
+
+@[simp, grind .]
+theorem Term.set_reduciable {s} {p: Loc} {v: Val} (h: p ∈ s):
+  Reduciable s [slf| [p] := [v] ]
+:= by
+  exists s[p => v], Val.unit
+  constructor
+  exact h
+
+@[simp, grind .]
+theorem Term.free_reduciable {s} {p: Loc} (h: p ∈ s):
+  Reduciable s [slf| free [p] ]
+:= by
+  exists s ÷ p, Val.unit
+  constructor
+  exact h
+
+end ReducibleMemOp
+
+section OmniBigStep
 /-!
 ## Omni-Big-step semantics of the language
 -/
 
 /-- EvalUnOp `op v P` means that `op v` evaluates to a value that satisfies `P`. -/
+@[grind]
 inductive EvalUnOp : Prim → Val → (Val → Prop) → Prop where
   | neg {b: Bool}:
       EvalUnOp .neg b (· = !b)
@@ -174,6 +440,7 @@ inductive EvalUnOp : Prim → Val → (Val → Prop) → Prop where
 
 
 /-- EvalBinOp `op v1 v2 P` means that `op v1 v2` evaluates to a value that satisfies `P`. -/
+@[grind]
 inductive EvalBinOp : Prim → Val → Val → (Val → Prop) → Prop where
   | eq {v1 v2: Val}:
       EvalBinOp .eq v1 v2 (· = (v1 == v2))
@@ -209,17 +476,20 @@ section PurePost
 `PurePost s P` converts a predicate `P: Val → Prop` into
 a postcondition of type `Val → Heap → Prop` that holds in the state `s`.
 -/
+@[grind]
 def PurePost (s: Heap) (P: Val → Prop): Val → Heap → Prop := fun v s' => P v ∧ s = s'
 
 /--
 equivalent to `PurePost s P ===> Q`
 -/
+@[grind]
 def PurePostIn (s: Heap) (P: Val → Prop) (Q: Val → Heap → Prop): Prop := ∀ v, P v → Q v s
 
 end PurePost
 
 section Eval
 
+@[grind]
 inductive Eval : Heap → Term → (Val → Heap → Prop) → Prop where
   | val {s} {v} {Q}:
       Q v s →
@@ -284,13 +554,13 @@ inductive Eval : Heap → Term → (Val → Heap → Prop) → Prop where
       Q .unit (s ÷ p) →
       Eval s [slf| free [p] ] Q
 
-
+@[grind .]
 theorem Eval.val_minimal {s v}:
   Eval s (.val v) (PurePost s (· = v))
 :=
   Eval.val (by simp [PurePost])
 
-
+@[grind .]
 theorem Eval.add {s} {n1 n2: Int} {Q: Val → Heap → Prop}:
   Q (n1 + n2) s →
   Eval s [slf| [n1] + [n2] ] Q
@@ -300,7 +570,7 @@ theorem Eval.add {s} {n1 n2: Int} {Q: Val → Heap → Prop}:
   simp [PurePostIn]
   exact H
 
-
+@[grind .]
 theorem Eval.sub {s} {n1 n2: Int} {Q: Val → Heap → Prop}:
   Q (n1 - n2) s →
   Eval s [slf| [n1] - [n2] ] Q
@@ -310,7 +580,7 @@ theorem Eval.sub {s} {n1 n2: Int} {Q: Val → Heap → Prop}:
   simp [PurePostIn]
   exact H
 
-
+@[grind .]
 theorem Eval.mul {s} {n1 n2: Int} {Q: Val → Heap → Prop}:
   Q (n1 * n2) s →
   Eval s [slf| [n1] * [n2] ] Q
@@ -320,7 +590,7 @@ theorem Eval.mul {s} {n1 n2: Int} {Q: Val → Heap → Prop}:
   simp [PurePostIn]
   exact H
 
-
+@[grind .]
 theorem Eval.div {s} {n1 n2: Int} {Q: Val → Heap → Prop}:
   n2 ≠ 0 →
   Q (n1 / n2) s →
@@ -331,7 +601,7 @@ theorem Eval.div {s} {n1 n2: Int} {Q: Val → Heap → Prop}:
   simp [PurePostIn]
   exact H
 
-
+@[grind .]
 theorem Eval.mod {s} {n1 n2: Int} {Q: Val → Heap → Prop}:
   n2 ≠ 0 →
   Q (n1 % n2) s →
@@ -342,7 +612,7 @@ theorem Eval.mod {s} {n1 n2: Int} {Q: Val → Heap → Prop}:
   simp [PurePostIn]
   exact H
 
-
+@[grind .]
 theorem Eval.rand {s} {n: Int} {Q: Val → Heap → Prop}:
   0 < n →
   (∀ n1: Int, 0 ≤ n1 → n1 < n → Q n1 s) →
@@ -364,6 +634,7 @@ app1 {s1 t1 t2 Q1 Q}:
   Eval s1 (.app t1 t2) Q
 ```
 -/
+@[grind .]
 theorem Eval.app1' {s1 t1 t2 Q1 Q}:
   Eval s1 t1 Q1 →
   (∀ v1 s2, Q1 v1 s2 → Eval s2 (.app v1 t2) Q) →
@@ -395,6 +666,7 @@ app2 {s1} {v1: Val} {t2 Q1 Q}:
   Eval s1 (.app v1 t2) Q
 ```
 -/
+@[grind .]
 theorem Eval.app2' {s1} {v1: Val} {t2 Q1 Q}:
   Eval s1 t2 Q1 →
   (∀ v2 s2, Q1 v2 s2 → Eval s2 (.app v1 v2) Q) →
@@ -414,7 +686,7 @@ theorem Eval.app2' {s1} {v1: Val} {t2 Q1 Q}:
     apply H2
     assumption
 
-
+@[grind .]
 def Term.eval_like (t1 t2: Term): Prop :=
   ∀ s Q, Eval s t1 Q → Eval s t2 Q
 

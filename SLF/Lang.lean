@@ -32,12 +32,12 @@ inductive Prim: Type where
   | ptr_add : Prim
   deriving Inhabited, Repr, BEq, DecidableEq
 
-
+@[grind]
 def Loc: Type := Nat deriving OfNat, Inhabited, Repr, BEq, DecidableEq, HAdd
 
-@[simp]
+@[simp, grind]
 def Loc.toNat (l: Loc): Nat := l
-@[simp]
+@[simp, grind]
 def Loc.toInt (l: Loc): Int := Int.ofNat l
 
 section Instances
@@ -103,18 +103,17 @@ instance: Coe Bool Val where
 instance {n}: OfNat Val n where
   ofNat := Val.int n
 
+instance: Coe Loc Val where
+  coe := Val.loc
+
 instance: Coe Val Term where
   coe := Term.val
 
 instance: Coe String Term where
   coe := Term.var
 
-
 instance {n}: OfNat Term n where
   ofNat := Term.val (Val.int n)
-
-
-def Term.loc (l: Loc): Term := Term.val (Val.loc l)
 
 end Instances
 end Definition

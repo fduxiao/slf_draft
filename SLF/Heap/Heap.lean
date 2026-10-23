@@ -6,6 +6,14 @@ open Map
 
 abbrev Heap := FMap Loc Val
 
+theorem Heap.exists_refresh (m: Heap) (null: Loc := 0):
+  ∃ (n: Loc), n ∉ m ∧ n ≠ null
+:= FMap.exists_refresh
+
+theorem Heap.single_refresh (m: Heap) (null: Loc := 0) (v):
+  ∃ (x: Loc), ∅[x => v] ⊥ m ∧ x ≠ null
+:= FMap.single_refresh
+
 @[grind]
 def HProp := Heap → Prop
 
