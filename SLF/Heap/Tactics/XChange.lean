@@ -306,7 +306,7 @@ scoped elab_rules: tactic
   let ltr: TSyntax `dir ← if ltr.isNone then `(dir| -> ) else pure ltr.get!
   evalTactic <| ← match goal with
   | ~q($A ==> $B) => `(tactic| xchange_rewrite $ltr $t)
-  | ~q($C ===> $D) => `(tactic| intro h <;> (try simp [-HProp.star_comm]) <;> xchange_rewrite $ltr $t <;> revert h)
+  | ~q($C ===> $D) => `(tactic| intro h <;> (try simp) <;> xchange_rewrite $ltr $t <;> revert h)
   | _ =>
     if goal.isForall then
       `(tactic| intro h <;> xchange $ltr $t <;> revert h)

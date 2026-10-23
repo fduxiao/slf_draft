@@ -38,9 +38,9 @@ scoped syntax "hprop_eq" (" only")?
 
 scoped macro_rules
   | `(tactic| hprop_eq only $[ [$[$x:term],* ] ]?) =>
-    `(tactic| ((try simp only $[ [ $[$x:term],* ] ]?)) <;> first | rfl | ac_rfl | grind)
+    `(tactic| (try simp only $[ [ $[$x:term],* ] ]?) <;> first | rfl | ac_rfl | grind)
   | `(tactic| hprop_eq $[ [$[$x:term],* ] ]?) =>
-    `(tactic| ((try simp $[ [ $[$x:term],* ] ]?)) <;> first | rfl | ac_rfl | grind)
+    `(tactic| (try simp $[ [ $[$x:term],* ] ]?) <;> first | rfl | ac_rfl | grind)
 
 end TacticHPropEq
 
@@ -48,6 +48,11 @@ section Examples
 /-!
 The following are some examples from SLF.
 -/
+
+example {H1 H2 H3}:
+  (H2 ** H1 -* H3) ** \[] = (H1 ** H2 -* H3) ** \[]
+:= by
+  hprop_eq
 
 example (H1 H2): H1 ** H2 ** \[] = H2 ** H1 ** \[] ** \[] := by
   hprop_eq

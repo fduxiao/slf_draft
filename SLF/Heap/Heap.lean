@@ -281,7 +281,7 @@ theorem HProp.star_assoc (H1 H2 H3: HProp):
   simp [HProp.star]
   grind
 
-@[simp, symm, grind =]
+@[symm, grind =]
 theorem HProp.star_comm (H1 H2: HProp):
   H1 ** H2 = H2 ** H1
 := by
@@ -563,7 +563,7 @@ section Wand
 theorem HProp.wand_eval {H1 H2: HProp} {h}:
   (H1 -* H2) h = ∃ H0, H0 h ∧ H0 ** H1 ==> H2
 := by
-  simp [HProp.wand]
+  simp [HProp.wand, HProp.star_comm]
 
 @[simp, grind =]
 theorem HProp.wand_equiv {H0 H1 H2: HProp}:
@@ -581,7 +581,7 @@ theorem HProp.wand_equiv {H0 H1 H2: HProp}:
   . rintro H h H0h
     simp [HProp.wand, HProp.exists]
     exists H0
-    simp_all
+    simp_all [HProp.star_comm]
 
 @[simp, grind .]
 theorem HProp.wand_cancel {H1 H2: HProp}:
@@ -592,7 +592,8 @@ theorem HProp.wand_cancel {H1 H2: HProp}:
   simp at H12h2
   obtain ⟨H0, H0h2, I⟩ := H12h2
   apply I
-  exists h1, h2
+  exists h2, h1
+  grind
 
 @[simp, grind .]
 theorem HProp.wand_cancel_counterexample:
@@ -658,7 +659,7 @@ theorem HProp.wand_pure_left {P H}:
 := by
   grind
 
-@[simp, grind =]
+@[grind =]
 theorem HProp.wand_curry_eq {H1 H2 H3: HProp}:
   (H1 ** H2) -* H3 = H1 -* (H2 -* H3)
 := by
@@ -667,8 +668,6 @@ theorem HProp.wand_curry_eq {H1 H2 H3: HProp}:
     obtain ⟨H0, H0h, E⟩ := K
     simp
     exists H0
-    simp_all
-    grind
   . grind
 
 @[grind .]
@@ -702,15 +701,16 @@ theorem HProp.qwand_eq {α} {Q1 Q2: α → HProp} {H: HProp}:
   apply Iff.intro
   . intro K a
     simp
-    rintro h ⟨h1, h2, Hh1, Q1ah2, HD, E⟩
-    specialize K h1 Hh1 a
+    rintro h ⟨h1, h2, Q1ah1, Hh2, HD, E⟩
+    specialize K h2 Hh2 a
     simp at K
     obtain ⟨H0, H0h1, I⟩ := K
     apply I
-    exists h1, h2
+    exists h2, h1
+    grind
   . intro K h Hh a
     specialize K a
-    simp_all
+    simp_all [HProp.star_comm]
     exists H
 
 @[simp, grind .]
