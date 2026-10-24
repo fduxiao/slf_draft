@@ -474,13 +474,14 @@ end OmniBigStep
 section PurePost
 /--
 `PurePost s P` converts a predicate `P: Val → Prop` into
-a postcondition of type `Val → Heap → Prop` that holds in the state `s`.
+a postcondition of type `Val → Heap → Prop` that holds in the state `s`,
+i.e. `fun v s' => P v ∧ s = s'`
 -/
 @[grind]
 def PurePost (s: Heap) (P: Val → Prop): Val → Heap → Prop := fun v s' => P v ∧ s = s'
 
 /--
-equivalent to `PurePost s P ===> Q`
+equivalent to `PurePost s P ===> Q`, i.e. `∀ v, P v → Q v s`
 -/
 @[grind]
 def PurePostIn (s: Heap) (P: Val → Prop) (Q: Val → Heap → Prop): Prop := ∀ v, P v → Q v s
@@ -687,14 +688,79 @@ theorem Eval.app2' {s1} {v1: Val} {t2 Q1 Q}:
     assumption
 
 @[grind .]
-def Term.eval_like (t1 t2: Term): Prop :=
+def Lang.Term.eval_like (t1 t2: Term): Prop :=
   ∀ s Q, Eval s t1 Q → Eval s t2 Q
 
 
 @[refl]
-theorem Term.eval_like.refl {t}:
-  Term.eval_like t t
+theorem Lang.Term.eval_like.refl {t: Term}:
+  t.eval_like t
 := by
   simp [Term.eval_like]
 
 end Eval
+
+section EvalProperties
+
+@[grind .]
+theorem Eval.conseq {s t Q1 Q2}:
+  Eval s t Q1 →
+  Q1 ===> Q2 →
+  Eval s t Q2
+:= by
+  intro M H
+  induction M <;> grind
+
+/--
+If a term `t` evaluates in a heap `h1` to a postcondition `Q`,
+  and we extend it to the disjoint union `h1 ∪ h2`,
+then `t` also evaluates in the combined heap `h1 ∪ h2`
+  to the postcondition `Q *+ (· = h2)`, which means that
+  the original postcondition `Q` holds for the part of the heap corresponding to `h1`,
+  and the new part of the heap is exactly `h2`.
+-/
+@[grind .]
+theorem Eval.frame {h1 h2 t Q}:
+  Eval h1 t Q →
+  h1 ⊥ h2 →
+  Eval (h1 ∪ h2) t (Q *+ (· = h2))
+:= by
+  intro M Hdisj
+  induction M
+  case app1 s1 t1 t2 Q1 Q HnV E1 E2 IH1 IH2 =>
+    apply Eval.app1
+    . exact HnV
+    . apply IH1
+      exact Hdisj
+    . intro v1 s2 H
+      simp at H
+      obtain ⟨s2a, s2b, Q1s2a, _, disj, E⟩ := H
+      subst s2b
+      subst s2
+      solve_by_elim
+  case app2 s1 v1 t2 Q1 Q Hnv E1 E2 IH1 IH2 =>
+    apply Eval.app2
+    . exact Hnv
+    . apply IH1
+      exact Hdisj
+    . intro v2 s2 H
+      simp at H
+      obtain ⟨s2a, s2b, Q1s2a, _, disj, E⟩ := H
+      subst s2b
+      subst s2
+      solve_by_elim
+  case seq s1 t1 t2 Q1 Q E1 E2 IH1 IH2 =>
+    apply Eval.seq
+    . apply IH1
+      exact Hdisj
+    . simp
+      grind only [HProp.star_elim]
+  case «let» Q1 s1 x t1 t2 Q E1 E2 IH1 IH2 =>
+    apply Eval.let
+    . apply IH1
+      exact Hdisj
+    . simp
+      grind only [HProp.star_elim]
+  all_goals grind
+
+end EvalProperties

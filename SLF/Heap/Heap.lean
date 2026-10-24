@@ -6,6 +6,8 @@ open Map
 
 abbrev Heap := FMap Loc Val
 
+section ExtraTheoremsAboutHeap
+
 theorem Heap.exists_refresh (m: Heap) (null: Loc := 0):
   ∃ (n: Loc), n ∉ m ∧ n ≠ null
 := FMap.exists_refresh
@@ -13,6 +15,15 @@ theorem Heap.exists_refresh (m: Heap) (null: Loc := 0):
 theorem Heap.single_refresh (m: Heap) (null: Loc := 0) (v):
   ∃ (x: Loc), ∅[x => v] ⊥ m ∧ x ≠ null
 := FMap.single_refresh
+
+@[simp, grind =]
+theorem Heap.read_single {x v}:
+  (∅[x => v]: Heap)[x]! = v
+:= by
+  simp [Mappoid.single]
+  simp [GetElem?.getElem!, Mappoid.find]
+
+end ExtraTheoremsAboutHeap
 
 @[grind]
 def HProp := Heap → Prop
@@ -274,6 +285,12 @@ theorem HProp.star_elim {H1 H2: HProp} {h}:
   simp [HProp.star]
 
 @[simp, grind =]
+theorem HProp.qstar_simp {α} {Q: α → HProp} {H: HProp} {x: α} {h}:
+  (Q *+ H) x h ↔ (Q x ** H) h
+:= by
+  simp [HProp.qstar, HProp.star]
+
+@[simp, grind =]
 theorem HProp.star_assoc (H1 H2 H3: HProp):
   (H1 ** H2) ** H3 = H1 ** (H2 ** H3)
 := by
@@ -527,6 +544,7 @@ theorem HProp.forall_spec {α} {J: α → HProp} {h}:
 := by
   simp [HProp.forall]
 
+@[grind =_]
 theorem HProp.forall_right {α} {J: α → HProp} {H: HProp}:
   (∀ x, H ==> J x) ↔
   H ==> \∀[J]
@@ -547,6 +565,7 @@ theorem HProp.forall_specialize {α} {J: α → HProp} {h} {x: α}:
   simp [HProp.forall]
   grind
 
+@[grind .]
 theorem HProp.imp_forall {α} {J1 J2: α → HProp}:
   J1 ===> J2 →
   \∀[J1] ==> \∀[J2]
@@ -688,7 +707,7 @@ section QWand
 /-!
 ## Properties of `HProp.qwand`
 -/
-@[simp, grind=]
+@[simp, grind =]
 theorem HProp.qwand_eval {α} {Q1 Q2: α → HProp} {h}:
   (Q1 -** Q2) h = (\∀ x, Q1 x -* Q2 x) h
 := by

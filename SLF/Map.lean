@@ -937,14 +937,14 @@ theorem FMap.elem?_eq {α β} [DecidableEq α] [Inhabited β] {m: FMap α β} {x
 := by
   simp [GetElem?.getElem?, Mappoid.find]
 
-@[simp]
-theorem FMap.single_elem? {α β} [DecidableEq α] [Inhabited β] {x: α} {v: β}:
+@[simp, grind =]
+theorem FMap.single_elem? {α β} [DecidableEq α] {x: α} {v: β}:
   (∅[x => v]: FMap α β)[x]? = some v
 := by
   simp [Mappoid.single]
   simp [GetElem?.getElem?, Mappoid.find]
 
-@[simp]
+@[simp, grind =]
 theorem FMap.read_single {α β} [DecidableEq α] [Inhabited β] {x: α} {v: β}:
   (∅[x => v]: FMap α β)[x]! = v
 := by
@@ -994,10 +994,13 @@ theorem FMap.union_single_eq {α β} [DecidableEq α] {m: FMap α β} {k: α} {v
   simp [Mappoid.update, Union.union]
 
 @[simp, grind =]
-theorem FMap.update_single_eq {α β} [DecidableEq α] {k: α} {v: β}:
-  ∅[k => v] [k => v] = (∅[k => v] : FMap α β)
+theorem FMap.update_single_eq {α β} [DecidableEq α] {k: α} {v w: β}:
+  ∅[k => v] [k => w] = (∅[k => w] : FMap α β)
 := by
   simp [FMap.eq_iff]
+  simp [Mappoid.update, Mappoid.single, Mappoid.union]
+  funext Int.Internal.Linear.Poly.combine_mul_k'
+  grind
 
 
 @[simp, grind =]
