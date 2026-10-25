@@ -111,6 +111,124 @@ theorem HProp.imp_apply {H1 H2: HProp} {h}:
 
 end Imp
 
+section CategoricalProperties
+
+/-!
+Now, `==>` is a partial order on `HProp`, we can have the yoneda lemma for `HProp`.
+-/
+
+/--
+Yoneda lemma for `HProp`. The proof is exactly how we prove the Yoneda lemma in category theory.
+-/
+theorem HProp.yoneda_lemma {A: HProp} {P: HProp → Prop}:
+  (forall H H', H ==> H' → P H' → P H) →  -- functoriality of `P`
+  ((forall H, (H ==> A) → P H) ↔ P A)
+:= by
+  intro F
+  apply Iff.intro
+  . /-
+      we only have to choose `H` to be `A`, i.e.
+      `(H ==> A) → P H` becomes `(A ==> A) → P A`.
+      Then, we use the reflexivity of `==>` to get `A ==> A`,
+      which corresponds to the `id` in the proof of Yoneda lemma.
+    -/
+    intro K
+    apply K
+    rfl
+  . /-
+    This time, we have to derive `P H` from `P A` and `H ==> A`, which
+    is exactly the the functoriality of `P`, i.e., the evaluation to
+    get the natural transformation.
+    -/
+    intro PA H HA
+    apply F
+    . exact HA
+    . exact PA
+
+/--
+The Yoneda lemma characterizes `==>` in terms of all hom-sets from any `H`.
+-/
+@[grind =_]
+theorem HProp.imp_iff_yoneda {A B: HProp}:
+  (forall H, (H ==> A) → (H ==> B)) ↔ A ==> B
+:= by
+  -- we apply the Yoneda lemma
+  apply HProp.yoneda_lemma
+  -- the functoriality comes from the transitivity of `==>`
+  intro H H' HH' H'B
+  apply HProp.imp_trans
+  . exact HH'
+  . exact H'B
+
+/--
+This is how you apply the Yoneda lemma to get `A ==> B`.
+Note that it should be an `iff` statement, but Lean fails to unify
+`imp_iff_yoneda.mp` with the goal sometimes.
+Therefore, we instead state the implication version here.
+Check `SLF.HProp.imp_iff_yoneda` for the equivalence version.
+-/
+@[grind .]
+theorem HProp.imp_by_yoneda {A B: HProp}:
+  (forall H, (H ==> A) → (H ==> B)) → A ==> B
+:= by
+  -- `apply HProp.imp_iff_yoneda.mp` fails, at least in v4.35.0
+  exact HProp.imp_iff_yoneda.mp
+
+/--
+This is the Yoneda embedding for `HProp`.
+It states that `A B: HProp` are equal `iff`
+they have the same hom-sets from any `H`.
+Note, we only prove one direction of `iff`, since
+the other direction is obvious.
+-/
+theorem HProp.yoneda_embedding {A B: HProp}:
+  (forall H, (H ==> A) ↔ (H ==> B)) → A = B
+:= by
+  intro E
+  ext
+  . apply HProp.imp_by_yoneda
+    intro H
+    apply (E H).mp
+  . rw [←HProp.imp_iff_yoneda]
+    intro H
+    apply (E H).mpr
+
+/--
+Given a presheaf `P: HProp → Prop`, then `P` is the colimit
+`P ≅ colimit {yX | X ∈ P}`, i.e.
+`P H` iff `∃ X ∈ P, H ==> X`.
+-/
+theorem HProp.density_theorem {P: HProp → Prop}:
+  (forall H H', H ==> H' → P H' → P H) → -- functoriality
+  forall H, P H ↔ ∃ X, P X ∧ H ==> X
+:= by
+  intro F H
+  apply Iff.intro
+  . intro PH
+    exists H
+  . rintro ⟨X, PX, HX⟩
+    apply F
+    . exact HX
+    . exact PX
+
+/--
+Given a sieve `S: HProp → Prop`, if the colimit `C` of `S` exists and `C ∈ S`
+(i.e., `S` is principal), then the colimit `C` of `S` is just itself in the sense
+of `S = yC`, i.e. `H ∈ S` iff `H ∈ yC` iff `H ==> C`.
+-/
+theorem HProp.principal_sieve_colimit {S: HProp → Prop} {C: HProp}:
+  (forall H H', H ==> H' → S H' → S H) →  -- functoriality of the sieve
+  ((
+    S C ∧
+    forall H, S H → H ==> C
+  ) ↔
+  (forall H, H ==> C ↔ S H))  -- i.e., S = yC
+:= by
+  intro F
+  grind
+
+end CategoricalProperties
+
 section QImp
 @[grind]
 def HProp.QImp {α} (Q1 Q2: α → HProp) : Prop := ∀ a, Q1 a ==> Q2 a

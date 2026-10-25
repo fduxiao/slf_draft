@@ -763,4 +763,17 @@ theorem Eval.frame {h1 h2 t Q}:
       grind only [HProp.star_elim]
   all_goals grind
 
+
+/-
+A More convenient theorem to apply the frame rule.
+-/
+@[grind .]
+theorem Eval.frame_conseq {h1 h2 t Q H}:
+  Eval h1 t Q →
+  h1 ⊥ h2 →
+  H h2 →
+  Eval (h1 ∪ h2) t (Q *+ H)
+:= by
+  grind
+
 end EvalProperties
