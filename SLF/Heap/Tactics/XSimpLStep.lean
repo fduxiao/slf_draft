@@ -300,7 +300,6 @@ section Examples
   xsimp_start
   guard_target = XSimp (\[], \[], (\∃ v, \[v = 2]) ** \[]) (\[], \[], H ** \[])
   xsimp_step_l
-  rename_i v
   guard_hyp v: Nat
   guard_target = XSimp (\[], \[], \[v = 2] ** \[]) (\[], \[], H ** \[])
   xsimp_step_l

@@ -304,7 +304,6 @@ scoped elab "xsimpl_handle_qimpl" : tactic => withMainContext do
     sorry
 
 scoped macro "xsimp_start" : tactic => `(tactic|
-  tactic_mark <;>
   (try simp only [HProp.star_empty_left, HProp.star_empty_right]) <;>
   intros <;>
   xsimpl_handle_qimpl <;>

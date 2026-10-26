@@ -91,6 +91,7 @@ open SLF Heap XSimp
   H3 ** H1 ** H4 ** (H1 -* H2) ==> H
 := by
   -- `xsimp` plays the following:
+  tactic_mark
   xsimp_start
   xsimp_step
   xsimp_step
@@ -115,6 +116,7 @@ This shows how revert works.
   H1 ** \[3 = 4] ==> H2
 := by
   -- `xsimp` plays the following:
+  tactic_mark
   xsimp_start
   xsimp_step
   xsimp_step

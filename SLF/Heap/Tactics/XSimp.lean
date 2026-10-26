@@ -364,7 +364,7 @@ end XSimpPost
 section XSimpTactic
 
 scoped macro "xsimp": tactic => `(tactic|
-  (xsimp_start <;> (repeat' xsimp_step) <;> xsimp_post; clear_mark')
+  (tactic_mark <;> xsimp_start <;> (repeat' xsimp_step) <;> xsimp_post; clear_mark')
 )
 
 scoped macro "xsimp" "[" ts:term,+ "]"?: tactic => `(tactic| xsimp_hint_put $[$ts],* <;> xsimp)
