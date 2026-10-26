@@ -8,6 +8,35 @@ section XSimpLRStep
 
 section StarsFlip
 
+/-!
+To exit an `XSimp` goal, we may need to rearrange the stars.
+We first look at how to do this manually.
+-/
+
+theorem XSimp.change_hra {HL} {Hra Hra' Hrg Hrt}:
+  Hra = Hra' →
+  XSimp HL (Hra', Hrg, Hrt) →
+  XSimp HL (Hra, Hrg, Hrt)
+:= by
+  grind
+
+#try {H1 H2: Nat → HProp} {n}:
+  XSimp (H2 n ** H1 n ** \[], \[], \[]) (H2 (?n + 1) ** H1 (?n + 1) ** \[], \[], \[])
+:= by
+  apply XSimp.change_hra
+  . show H2 (?n + 1) ** H1 (?n + 1) ** \[] = H1 (?n + 1) ** H2 (?n + 1) ** \[]
+    -- `ac_rfl` will instantiate `?n` to `0`. At least, this happens in v4.35.0
+    hprop_eq
+  guard_target =
+    XSimp
+      (H2 n ** H1 n ** \[], \[], \[])
+      (H1 (?n + 1) ** H2 (?n + 1) ** \[], \[], \[])
+  sorry
+
+/-!
+This tactic helps us automatically flip the order of stars in
+an `XSimp` goal to match the expected form.
+-/
 scoped elab "hstars_flip": tactic => withMainContext do
   let goal ← getMainGoalQ
   match goal with
@@ -20,7 +49,7 @@ scoped elab "hstars_flip": tactic => withMainContext do
     let rhs ← joinStar stars
     let lhs ← delabNoPP lhs
     let rhs ← delabNoPP rhs
-    evalTactic <| ← `(tactic| refine @id ($lhs = $rhs) (by hprop_eq) )
+    evalTactic <| ← `(tactic| show ($lhs = $rhs) <;> hprop_eq)
   | _ => throwError "hstars_flip failed"
 
 #try {p H2}:
@@ -48,13 +77,6 @@ example:
   hstars_flip
   rfl
 
-theorem XSimp.change_hra {HL} {Hra Hra' Hrg Hrt}:
-  Hra = Hra' →
-  XSimp HL (Hra', Hrg, Hrt) →
-  XSimp HL (Hra, Hrg, Hrt)
-:= by
-  grind
-
 macro "xsimp_flip_acc_l": tactic => `(tactic|
   refine XSimp.change_hla (by hstars_flip) ?_
 )
@@ -67,6 +89,17 @@ macro "xsimp_flip_acc": tactic => `(tactic|
   (try xsimp_flip_acc_l) <;>
   (try xsimp_flip_acc_r)
 )
+
+
+#try {H1 H2: Nat → HProp} {n}:
+  XSimp (H2 n ** H1 n ** \[], \[], \[]) (H2 (?n + 1) ** H1 (?n + 1) ** \[], \[], \[])
+:= by
+  xsimp_flip_acc
+  guard_target =
+    XSimp
+      (H1 n ** H2 n ** \[], \[], \[])
+      (H1 (?n + 1) ** H2 (?n + 1) ** \[], \[], \[])
+  sorry
 
 #try {p} {H1 H2 H3 H4: HProp}:
   H1 ** \∃ (n: Int), (p ~~> n ** H2) ** H3 ==> H4
@@ -225,6 +258,14 @@ scoped elab "xsimp_step_lr" : tactic => withMainContext do
     throwError "xsimp_step_lr match failed"
 
 open Lang
+
+#try {H1 H2: Nat → HProp} {n}:
+  XSimp (H2 n ** H1 n ** \[], \[], \[]) (H2 (?n + 1) ** H1 (?n + 1) ** \[], \[], \[])
+:= by
+  xsimp_step_lr
+  guard_target =
+    H1 n ** H2 n ** \[] ==> H1 (?n + 1) ** H2 (?n + 1) ** \[]
+  sorry
 
 example {Q1 Q2 Q': Val → HProp}:
   XSimp ((Q' -** Q1) ** (Q1 -** Q2) ** \[], \[], \[]) ((Q' -** Q2) ** \[], \[], \[])
@@ -560,5 +601,44 @@ example {Q1 Q2: Val → HProp} {F: (Val → HProp) → HProp}:
   (\∃ Q', F Q' ** (Q' -** Q1)) ** (Q1 -** Q2) ==> \∃ Q', F Q' ** (Q' -** Q2)
 := by
   xsimp
+
+open XSimp
+
+/-!
+The revert will cause some trouble here
+-/
+#try {Q1 Q2: Nat → HProp}:
+  \∃ n: Nat, Q1 n ** Q2 n ==> \∃ n: Nat, Q1 (n - 1) ** Q2 (n - 1)
+:= by
+  xsimp
+  . guard_target = ∀ (n : Nat), Q1 n ** Q2 n ==> Q1 (_ - 1) ** Q2 (_ - 1)
+    intro n
+    show Q1 n ** Q2 n ==> Q1 (_ - 1) ** Q2 (_ - 1)
+    sorry
+  . sorry
+
+/-!
+In this case, we can apply those _x-tactics_ explicitly.
+-/
+#try {Q1 Q2: Nat → HProp}:
+  \∃ n: Nat, Q1 n ** Q2 n ==> \∃ n: Nat, Q1 (n - 1) ** Q2 (n - 1)
+:= by
+  xsimp_start
+  repeat xsimp_step
+  . simp
+    show _ ==> Q1 ((n+1) - 1) ** Q2 ((n+1) - 1)
+    simp
+
+/-!
+Or, we can use `xpull` first.
+-/
+#try {Q1 Q2: Nat → HProp}:
+  \∃ n: Nat, Q1 n ** Q2 n ==> \∃ n: Nat, Q1 (n - 1) ** Q2 (n - 1)
+:= by
+  xpull
+  intro n
+  xsimp
+  . show _ ==> Q1 (n + 1 - 1) ** Q2 (n + 1 - 1)
+    simp
 
 end Examples

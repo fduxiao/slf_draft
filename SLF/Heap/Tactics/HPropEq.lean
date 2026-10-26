@@ -38,9 +38,38 @@ scoped syntax "hprop_eq" (" only")?
 
 scoped macro_rules
   | `(tactic| hprop_eq only $[ [$[$x:term],* ] ]?) =>
-    `(tactic| (try simp only $[ [ $[$x:term],* ] ]?) <;> first | rfl | ac_rfl | grind)
+    `(tactic| (try simp only $[ [ $[$x:term],* ] ]?) <;> first | rfl /-| ac_rfl -/| grind)
   | `(tactic| hprop_eq $[ [$[$x:term],* ] ]?) =>
-    `(tactic| (try simp $[ [ $[$x:term],* ] ]?) <;> first | rfl | ac_rfl | grind)
+    `(tactic| (try simp $[ [ $[$x:term],* ] ]?) <;> first | rfl /-| ac_rfl -/| grind)
+
+/-!
+`ac_rfl` will cause some trouble (at least in v4.35.0). See the following examples.
+-/
+example (f: Nat → Nat):
+  f 2 = 2 →
+  (forall {m n: Nat}, m = n → n = 6 → m = 6 ) →
+  ∃ k, 3 * (f (k + 1)) = 6
+:= by
+  intro E H
+  apply Exists.intro ?k
+  . apply H
+    . show 3 * (f (?k + 1)) = (f (?k + 1)) * 3
+      lia
+    . show f (1 + 1) * 3 = 6
+      simp_all
+
+#try (f: Nat → Nat):
+  f 2 = 2 →
+  (forall {m n: Nat}, m = n → n = 6 → m = 6 ) →
+  ∃ k, 3 * (f (k + 1)) = 6
+:= by
+  intro E H
+  apply Exists.intro ?k
+  . apply H
+    . show 3 * (f (?k + 1)) = (f (?k + 1)) * 3
+      ac_rfl
+    . -- f (0 + 1) * 3 = 6
+      sorry
 
 end TacticHPropEq
 
