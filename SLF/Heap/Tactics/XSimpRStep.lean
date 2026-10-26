@@ -147,7 +147,20 @@ macro "xsimpl_hgc_or_htop_cancel" t:term "by" th:term: tactic =>
   `(tactic| repeat( xsimp_pick_same $t <;> apply $th ))
 
 macro "xsimp_cancel_same" t:term: tactic =>
-  `(tactic| xsimp_pick_same $t <;> apply XSimp.lr_cancel_same)
+  `(tactic| xsimp_pick_same $t <;> refine XSimp.lr_cancel_same ?_)
+
+open Lang in
+#try {Q' Q1 Q2: Val → HProp} {F: (Val → HProp) → HProp}:
+  XSimp
+    ((Q' -** Q1) ** (Q1 -** Q2) ** F Q' ** \[], \[], \[])
+    (\[], \[], (F ?Q') ** (?Q' -** Q2) ** \[])
+:= by
+  xsimp_cancel_same F ?_
+  guard_target =
+    XSimp
+      ((Q' -** Q1) ** (Q1 -** Q2) ** \[], \[], \[])
+      (\[], \[], (Q' -** Q2) ** \[])
+  all_goals sorry
 
 def XHelpers.gcOrTop (Hrg H: Q(HProp)) : MetaM (TSyntax `tactic) := do
   match Hrg, H with
@@ -294,20 +307,38 @@ example {H1 H2 H3 H4}:
   . guard_target = XSimp (H3 ** \[], \[], \[]) (H1 ** \[], \[], \[])
     sorry
 
+-- MVars should also be matched
+open Lang in
+#try {Q' Q1 Q2: Val → HProp} {F: (Val → HProp) → HProp}:
+  XSimp
+    ((Q' -** Q1) ** (Q1 -** Q2) ** F Q' ** \[], \[], \[])
+    (\[], \[], (\∃ Q', F Q' ** (Q' -** Q2)) ** \[])
+:= by
+  repeat' xsimp_step_l
+  xsimp_step_r
+  xsimp_step_r
+  guard_target =
+    XSimp
+      ((Q' -** Q1) ** (Q1 -** Q2) ** F Q' ** \[], \[], \[])
+      (\[], \[], (F ?Q') ** (?Q' -** Q2) ** \[])
+  xsimp_step_r
+  all_goals sorry
+
 /-!
 single map is not in `xsimp_step_r` here.
 -/
 
+
 open Lang in
 #try {p}:
-  p ~~> 3 ==> \∃ (n:Int), p ~~> n
+  p ~~> 3 ==> \∃ (n:Int), p ~~> (n + 1: Int)
 := by
   xsimp_start
   repeat xsimp_step_l
   xsimp_step_r
   xsimp_step_r
   . guard_target =
-      XSimp (p ~~> 3 ** \[], \[], \[]) (p ~~> [slf| [?n] ] ** \[], \[], \[])
+      XSimp (p ~~> 3 ** \[], \[], \[]) (p ~~> (?n + 1: Int) ** \[], \[], \[])
     sorry
   . guard_target = Int
     sorry
@@ -326,7 +357,7 @@ scoped elab "xsimp_hook_single" _t:term: tactic => withMainContext do
   | ~q($p ~~> $v) =>
     let filter (h: Q(HProp)): MetaM Bool := do
       match h with
-      | ~q($p' ~~> $v) => pure <| p' == p
+      | ~q($p' ~~> $v) => isDefEqOpaque p' p
       | _ => pure false
     let e ← searchFor? filter Hla
     match e with
@@ -361,6 +392,19 @@ example {p}:
   xsimp_step_r
   guard_target = XSimp (\[], \[], \[]) (\[], \[], \[])
   simp [XSimp]
+
+example {p}:
+  p ~~> 3 ==> \∃ (n:Int), p ~~> (n + 1: Int)
+:= by
+  xsimp_start
+  repeat xsimp_step_l
+  xsimp_step_r
+  guard_target = XSimp (p ~~> 3 ** \[], \[], \[]) (\[], \[], p ~~> [slf| [(?n + 1: Int)] ] ** \[])
+  xsimp_step_r
+  . show (3: Val) = (.int (2 + 1))
+    congr
+  . guard_target = XSimp (\[], \[], \[]) (\[], \[], \[])
+    simp [XSimp]
 
 #try {p H1 H2}:
   p ~~> 3 ** H1 ==> H2 ** \∃ (n:Int), p ~~> n
@@ -506,5 +550,23 @@ example {H1 H2 H3}:
   . guard_target =
       XSimp (H1 ** \[], \[], \[]) (H2 ** \[], \[], H4 ** \[])
     sorry
+
+#try {Q1 Q2: Val → HProp} {F: (Val → HProp) → HProp}:
+  (\∃ Q', F Q' ** (Q' -** Q1)) ** (Q1 -** Q2) ==> \∃ Q', F Q' ** (Q' -** Q2)
+:= by
+  xsimp_start
+  repeat' xsimp_step_l
+  xsimp_step_r
+  xsimp_step_r
+  guard_target =
+    XSimp
+      ((Q' -** Q1) ** (Q1 -** Q2) ** F Q' ** \[], \[], \[])
+      (\[], \[], F ?Q' ** (?Q' -** Q2) ** \[])
+  xsimp_step_r
+  guard_target =
+    XSimp
+      ((Q' -** Q1) ** (Q1 -** Q2) ** \[], \[], \[])
+      (\[], \[], (Q' -** Q2) ** \[])
+  all_goals sorry
 
 end Examples

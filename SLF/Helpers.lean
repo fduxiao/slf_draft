@@ -189,6 +189,10 @@ end TacticMark
 section Misc
 open Lean
 
+def Lean.Meta.isDefEqOpaque (e1 e2: Expr): MetaM Bool := do
+  withAssignableSyntheticOpaque do
+    isDefEq e1 e2
+
 def Lean.Expr.removeMData (e: Expr): Expr :=
   match e with
   | .mdata _ b => b.removeMData

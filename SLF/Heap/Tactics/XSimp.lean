@@ -203,7 +203,7 @@ scoped elab "xsimp_step_lr" : tactic => withMainContext do
             | ~q(@HProp.qwand Unit $Q1 $Q2) =>
               `(tactic| xsimp_flip_acc_l <;> apply XSimp.lr_qwand_unit)
             | _ =>
-              `(tactic| xsimp_flip_acc_l <;> apply XSimp.lr_qwand)
+              `(tactic| xsimp_flip_acc_l <;> apply XSimp.lr_qwand <;> intro _)
         | ~q(HProp.forall _) =>
           `(tactic| xsimp_flip_acc_l <;> apply XSimp.lr_hforall <;> intro _)
         | _ =>
@@ -225,6 +225,32 @@ scoped elab "xsimp_step_lr" : tactic => withMainContext do
     throwError "xsimp_step_lr match failed"
 
 open Lang
+
+example {Q1 Q2 Q': Val → HProp}:
+  XSimp ((Q' -** Q1) ** (Q1 -** Q2) ** \[], \[], \[]) ((Q' -** Q2) ** \[], \[], \[])
+:= by
+  xsimp_step_lr
+  guard_target =
+    XSimp
+      (\[], \[], Q' _ ** (Q1 -** Q2) ** (Q' -** Q1) ** \[])
+      (\[], \[], Q2 _ ** \[])
+  xsimp_step_l
+  xsimp_step_l
+  xsimp_step_l
+  guard_target =
+    XSimp
+      (Q' _ ** \[], (Q' -** Q1) ** (Q1 -** Q2) ** \[], \[])
+      (\[], \[], Q2 _ ** \[])
+  xsimp_step_l
+  guard_target =
+    XSimp
+      (\[], (Q1 -** Q2) ** \[], \[] ** Q1 _ ** \[])
+      (\[], \[], Q2 _ ** \[])
+  repeat xsimp_step_l
+  guard_target =
+    XSimp (Q2 _ ** \[], \[], \[]) (\[], \[], Q2 _ ** \[])
+  xsimp_step_r
+  xsimp_step_lr
 
 #try {H2 H4}:
   XSimp (H2 ** H4 ** \[], \[], \[]) (\[], \[], \[])
@@ -529,5 +555,10 @@ wands
   xsimp
   guard_target = H4 ** H2 ==> \[]
   sorry
+
+example {Q1 Q2: Val → HProp} {F: (Val → HProp) → HProp}:
+  (\∃ Q', F Q' ** (Q' -** Q1)) ** (Q1 -** Q2) ==> \∃ Q', F Q' ** (Q' -** Q2)
+:= by
+  xsimp
 
 end Examples

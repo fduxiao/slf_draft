@@ -47,11 +47,37 @@ elab "xsimp_pick_same" t:term : tactic => withMainContext do
   let ⟨Hla, _, _⟩ ← match lhs with
     | ~q(($Hla, $Hlw, $Hlt)) => pure (Hla, Hlw, Hlt)
     | _ => throwError m!"unexpected LHS structure {lhs}"
-  let Hla ← searchFor? (fun stx => pure $ stx == t) Hla
+  let Hla ← searchFor? (isDefEqOpaque t) Hla
   if Hla.isNone then
     throwError m!"term {t} not found in {lhs}"
   let Hla := Hla.get!
   evalTactic <| ← XHelpers.changeHla Hla
+
+open Lang in
+#try {Q' Q1 Q2: Val → HProp} {F: (Val → HProp) → HProp}:
+  XSimp
+    ((Q' -** Q1) ** (Q1 -** Q2) ** F Q' ** \[], \[], \[])
+    (\[], \[], (F ?Q') ** (?Q' -** Q2) ** \[])
+:= by
+  xsimp_pick_same F ?_
+  guard_target =
+    XSimp
+      (F Q' ** (Q' -** Q1) ** (Q1 -** Q2) ** \[], \[], \[])
+      (\[], \[], (F ?Q') ** (?Q' -** Q2) ** \[])
+  all_goals sorry
+
+open Lang in
+#try {Q' Q1 Q2: Val → HProp} {F: (Val → HProp) → HProp}:
+  XSimp
+    ((Q' -** Q1) ** (Q1 -** Q2) ** F Q' ** \[], \[], \[])
+    (\[], \[], (F ?Q') ** (?Q' -** Q2) ** \[])
+:= by
+  xsimp_pick_same F _
+  guard_target =
+    XSimp
+      (F Q' ** (Q' -** Q1) ** (Q1 -** Q2) ** \[], \[], \[])
+      (\[], \[], (F ?Q') ** (?Q' -** Q2) ** \[])
+  all_goals sorry
 
 theorem XSimp.left_flatten (Hla Hlw H1 H2 H3: HProp) R:
   XSimp (Hla, Hlw, (H1 ** H2) ** H3) R ↔
@@ -211,7 +237,7 @@ scoped elab "xsimp_step_l_core" c:bool v:bool : tactic => withMainContext do
             `(tactic| $t1 <;> $t2 <;> apply XSimp.left_cancel_wand_star)
       | _ =>
         if cancel_wands then
-          let Hs ← searchFor? (λ h => pure $ h == H1) Hla
+          let Hs ← searchFor? (isDefEqOpaque H1) Hla
           if Hs.isNone then
             `(tactic| apply XSimp.left_keep_wand)
           else
@@ -227,7 +253,7 @@ scoped elab "xsimp_step_l_core" c:bool v:bool : tactic => withMainContext do
         `(tactic| apply XSimp.left_keep_wand)
     | ~q(($Hla, (($Q1 -** $Q2) ** $Hlw), \[])) =>
       if cancel_wands then
-        let Hs ← searchFor? (λ h => pure $ if h.isApp then h.appFn! == Q1 else false) Hla
+        let Hs ← searchFor? (λ h => if h.isApp then isDefEqOpaque h.appFn! Q1 else pure false) Hla
         if Hs.isNone then
           `(tactic| apply XSimp.left_keep_wand)
         else
