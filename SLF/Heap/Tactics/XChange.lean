@@ -275,6 +275,8 @@ scoped elab_rules : tactic
     evalTactic <| ← match ty with
     | ~q($A ==> $B) | ~q($C = $D) =>
       `(tactic| xchange_rewrite_core $ltr $M)
+    | ~q($A ===> $B) =>
+      `(tactic| xchange_rewrite_core $ltr ($M _))
     | _ =>
       if ty.isForall then
         `(tactic| xchange_rewrite $ltr ($M _))
@@ -293,13 +295,26 @@ scoped elab_rules : tactic
   guard_target = (J 3 ** H1) ** H3 ==> H4
   sorry
 
+example {Q1 Q2 Q3: Nat → HProp}:
+  Q1 ===> Q2 →
+  Q2 ===> Q3 →
+  forall x, Q1 x ==> Q3 x
+:= by
+  intro H1 H2 x
+  guard_target = Q1 x ==> Q3 x
+  xchange_rewrite H1
+  guard_target = Q2 x ==> Q3 x
+  xchange_rewrite H2
+  guard_target = Q3 x ==> Q3 x
+  rfl
+
 end XChangeRewrite
 
 section XChange
 
 open Lean Meta Elab Tactic Qq XHelpers
 
-syntax "xchange" (dir)? term : tactic
+scoped syntax "xchange" (dir)? term : tactic
 scoped elab_rules: tactic
 | `(tactic| xchange $[$ltr]? $t) => withMainContext do
   let goal ← getMainGoalQ
@@ -312,6 +327,15 @@ scoped elab_rules: tactic
       `(tactic| intro h <;> xchange $ltr $t <;> revert h)
     else
       throwError "xchange only supports goals of the form `_ ==> _` or `_ ===> _`"
+
+theorem xchange_qexit {α} {Q1 Q2: α → HProp}:
+  Q1 ===> Q2 →
+  (forall x, Q1 x ==> Q2 x)
+:= by
+  intro H
+  grind
+
+scoped macro "xchange_qexit" : tactic => `(tactic| apply xchange_qexit)
 
 #try {H1 H3 H4} (J J':Int → HProp):
   (forall n, J n ** H1 = J' (n + 1)) →
@@ -336,5 +360,20 @@ scoped elab_rules: tactic
   xchange ← H -- similarly here
   guard_target = ∀ (h : Int), J h ** H1 ==> J' h
   sorry
+
+example {Q1 Q2 Q3: Nat → HProp}:
+  Q1 ===> Q2 →
+  Q2 ===> Q3 →
+  Q1 ===> Q3
+:= by
+  intro H1 H2
+  guard_target = Q1 ===> Q3
+  xchange H1
+  guard_target =~ Q2 ===> Q3
+  xchange H2
+  guard_target = forall h, Q3 h ==> Q3 h
+  xchange_qexit
+  guard_target = Q3 ===> Q3
+  simp
 
 end XChange
