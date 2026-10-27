@@ -349,17 +349,25 @@ section XChange
 
 open Lean Meta Elab Tactic Qq XHelpers
 
-scoped syntax "xchange" (dir)? term : tactic
+scoped syntax "xchange" ("[" ident "]")? (dir)? term : tactic
 scoped elab_rules: tactic
-| `(tactic| xchange $[$ltr]? $t) => withMainContext do
+| `(tactic| xchange $[[ $x ]]? $[$ltr]? $t) => withMainContext do
   let goal ← getMainGoalQ
   let ltr: TSyntax `dir ← if ltr.isNone then `(dir| -> ) else pure ltr.get!
   evalTactic <| ← match goal with
   | ~q($A ==> $B) => `(tactic| xchange_rewrite $ltr $t)
-  | ~q($C ===> $D) => `(tactic| intro h <;> (try simp) <;> xchange_rewrite $ltr $t <;> revert h)
+  | ~q($C ===> $D) => do
+    let id: TSyntax `ident ← match x with
+      | some x => pure x
+      | none => pure <| mkIdent `x
+    `(tactic| intro $id:ident <;> (try simp) <;> xchange_rewrite $ltr $t <;> revert $id)
   | _ =>
     if goal.isForall then
-      `(tactic| intro h <;> xchange $ltr $t <;> revert h)
+      let name := goal.bindingName!
+      let id := match x with
+        | some x => x
+        | none => mkIdent name
+      `(tactic| intro $id:ident <;> xchange $ltr $t <;> revert $id)
     else
       throwError "xchange only supports goals of the form `_ ==> _` or `_ ===> _`"
 
@@ -390,10 +398,13 @@ scoped macro "xchange_qexit" : tactic => `(tactic| apply xchange_qexit)
 := by
   intro H
   guard_target = J *+ H1 ===> J'
-  xchange H  -- we can use H directly
-  guard_target = ∀ (h : Int), J' (h + 1) ==> J' h
+  xchange [n] H  -- we can use H directly, [n] is to hint the variable name to use in the forall.
+  -- Note the name `n` is not tested.
+  guard_target = ∀ (n : Int), J' (n + 1) ==> J' n
   xchange ← H -- similarly here
-  guard_target = ∀ (h : Int), J h ** H1 ==> J' h
+  -- After xchange, the name should be reverted back to `n`.
+  -- Note this is not tested.
+  guard_target = ∀ (n : Int), J n ** H1 ==> J' n
   sorry
 
 example {Q1 Q2 Q3: Nat → HProp}:
