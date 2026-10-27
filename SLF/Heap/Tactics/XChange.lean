@@ -4,7 +4,8 @@ namespace SLF.Heap.XSimp
 
 theorem xchange_rewrite {motive: HProp → HProp} {P L P' Q}:
   motive P = L →
-  P ==> P' → (motive P ==> motive P') →
+  P ==> P' →
+  (P ==> P' → motive P ==> motive P') →
   motive P' ==> Q →
   L ==> Q
 := by
@@ -153,6 +154,40 @@ section XChangeRewrite
 open Lean Meta Elab Tactic Qq XHelpers
 
 section Core
+
+/--
+Only display the motive and other relevant information for the rewrite.
+-/
+scoped elab "xchange_rewrite_try" ltr:(dir)? M:term : tactic => withMainContext do
+  let ltr := match ltr with
+    | some x => interpDir x
+    | none => true
+  let goal ← getMainGoalQ
+  let ⟨lhs, rhs⟩ ← parseHPropImp goal
+  -- get the type of M
+  let M ← elabTerm M none
+  let mut ty: Q(Prop) ← inferType M
+  let (lhs', stx) ← match ty with
+    | ~q($A ==> $B) => pure (A, none)
+    | ~q($A = $B) =>
+      if ltr then
+        pure (A, some <| ← `(HProp.imp_mp))
+      else
+        pure (B, some <| ← `(HProp.imp_mpr))
+    | _ =>
+      throwError m!"unexpected type: {ty}"
+  let some motive ← xchange_motive lhs lhs' | throwError m!"no motive found: {lhs} - {lhs'}"
+  logInfo m!"found motive: {motive}\n"
+  let motive ← PrettyPrinter.delab motive
+  let rhs ← PrettyPrinter.delab rhs
+  let M ← PrettyPrinter.delab M
+  let stx ← match stx with
+    | none => pure M
+    | some x => `($x $M)
+  logInfo m!"tactic is:
+    apply xchange_rewrite (Q := {rhs}) (motive := {motive}) (by hprop_eq) ({stx}) (by grind)
+  "
+
 /--
 This is the core tactic for rewriting heap propositions by finding the motive.
 -/
@@ -182,7 +217,7 @@ scoped elab "xchange_rewrite_core" ltr:(dir)? M:term : tactic => withMainContext
     | none => pure M
     | some x => `($x $M)
   evalTactic <|
-    ← `(tactic| apply xchange_rewrite (Q := $rhs) (motive := $motive) (by hprop_eq) ($stx) (by grind))
+    ← `(tactic| apply xchange_rewrite (Q := $rhs) (motive := $motive) (by hprop_eq) ($stx) ; try grind)
 
 #try {H1 H2 H2' H3 H4}:
   H2 ==> H2' →
