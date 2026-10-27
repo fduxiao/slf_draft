@@ -8,4 +8,4 @@ name = "SLF"
 [[require]]
 name = "Quote4"
 scope = "leanprover-community"
-rev = "v4.34.0"
+rev = "b0256621cb88178e9ad932a53633077b3029e621"

@@ -52,11 +52,24 @@ theorem HProp.Imp.trans {H1 H2 H3: HProp}:
   specialize h23 h
   apply h23 (h12 h1)
 
+@[grind .]
+theorem HProp.Imp.trans_r {H1 H2 H3: HProp}:
+  H2 ==> H3 →
+  H1 ==> H2 →
+  H1 ==> H3
+:= by grind
+
 abbrev HProp.imp_trans {H1 H2 H3: HProp}:
   H1 ==> H2 →
   H2 ==> H3 →
   H1 ==> H3
 := HProp.Imp.trans
+
+abbrev HProp.imp_trans_r {H1 H2 H3: HProp}:
+  H2 ==> H3 →
+  H1 ==> H2 →
+  H1 ==> H3
+:= HProp.Imp.trans_r
 
 instance: Trans HProp.Imp HProp.Imp HProp.Imp := ⟨HProp.imp_trans⟩
 instance: Trans (@Eq HProp) HProp.Imp HProp.Imp := Trans.mk $ by simp_all
