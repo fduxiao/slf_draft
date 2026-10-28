@@ -84,6 +84,38 @@ inductive Term : Type where
 
 end
 
+def Term.ind.{u} {motive: Term → Sort u}
+  (val : ∀ v, motive (Term.val v))
+  (var : ∀ x, motive (Term.var x))
+  («fun» : ∀ x t, motive t → motive (Term.fun x t))
+  (fix : ∀ f x t, motive t → motive (Term.fix f x t))
+  (app : ∀ t1 t2, motive t1 → motive t2 → motive (Term.app t1 t2))
+  (seq : ∀ t1 t2, motive t1 → motive t2 → motive (Term.seq t1 t2))
+  («let» : ∀ x t1 t2, motive t1 → motive t2 → motive (Term.let x t1 t2))
+  («if» : ∀ t1 t2 t3, motive t1 → motive t2 → motive t3 → motive (Term.if t1 t2 t3))
+: ∀ t, motive t
+  | .val v => val v
+  | .var x => var x
+  | .fun x t => «fun» x t (Term.ind val var «fun» fix app seq «let» «if» t)
+  | .fix f x t => «fix» f x t (Term.ind val var «fun» fix app seq «let» «if» t)
+  | .app t1 t2 =>
+    app t1 t2
+    (Term.ind val var «fun» fix app seq «let» «if» t1)
+    (Term.ind val var «fun» fix app seq «let» «if» t2)
+  | .seq t1 t2 =>
+    seq t1 t2
+      (Term.ind val var «fun» fix app seq «let» «if» t1)
+      (Term.ind val var «fun» fix app seq «let» «if» t2)
+  | .let x t1 t2 =>
+    «let» x t1 t2
+      (Term.ind val var «fun» fix app seq «let» «if» t1)
+      (Term.ind val var «fun» fix app seq «let» «if» t2)
+  | .if t1 t2 t3 =>
+    «if» t1 t2 t3
+      (Term.ind val var «fun» fix app seq «let» «if» t1)
+      (Term.ind val var «fun» fix app seq «let» «if» t2)
+      (Term.ind val var «fun» fix app seq «let» «if» t3)
+
 section Instances
 instance: Coe Prim Val where
   coe := Val.prim

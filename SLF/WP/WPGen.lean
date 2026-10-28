@@ -1,0 +1,510 @@
+import SLF.WP.WP
+
+namespace SLF
+open Map Lang Heap XSimp
+/-!
+`WP` is the semantic function for weakest preconditions. We hope to
+define a `wpgen` function based on the syntactic structure of terms.
+-/
+namespace MSubst
+
+@[grind]
+abbrev Context := List (Var × Val)
+
+@[grind]
+def Context.lookup (v : Var) (ctx : Context) : Option Val := List.lookup v ctx
+
+@[grind]
+def Context.remove (v : Var) (ctx : Context) : Context := List.filter (fun p => p.1 != v) ctx
+
+@[grind]
+def Context.disjoint (ctx1 ctx2 : Context) : Prop :=
+  ∀ x, (Context.lookup x ctx1) ≠ none → (Context.lookup x ctx2) = none
+
+@[symm]
+theorem Context.disjoint_symm {ctx1 ctx2 : Context} :
+  Context.disjoint ctx1 ctx2 → Context.disjoint ctx2 ctx1
+:= by
+  grind
+
+@[simp, grind]
+def Context.equiv (ctx1 ctx2 : Context) : Prop :=
+  ∀ v, Context.lookup v ctx1 = Context.lookup v ctx2
+
+@[grind]
+instance: HasEquiv Context where
+  Equiv := Context.equiv
+
+@[simp, refl, grind =]
+theorem Context.equiv_refl {ctx : Context} :
+  ctx ≈ ctx
+:= by
+  intro v
+  grind
+
+-- This line has to be long enough in order to trigger the error.
+
+@[simp, symm, grind .]
+theorem Context.equiv_symm {ctx1 ctx2 : Context} :
+  ctx1 ≈ ctx2 → ctx2 ≈ ctx1
+:= by
+  simp
+  grind
+
+@[simp, grind =]
+theorem Context.lookup_cons {x : Var} {ctx: Context} {y : Var} {v : Val}:
+  Context.lookup x ((y, v) :: ctx) = (if x == y then some v else ctx.lookup x)
+:= by
+  induction ctx <;> grind
+
+@[simp, grind =]
+theorem Context.lookup_app {x : Var} {ctx1 ctx2 : Context} :
+  (ctx1 ++ ctx2).lookup x = (ctx1.lookup x <|> ctx2.lookup x)
+:= by
+  induction ctx1 <;> grind
+
+@[simp]
+theorem Context.lookup_remove {x y : Var} {ctx : Context}:
+  (ctx.remove y).lookup x = if x == y then none else ctx.lookup x
+:= by
+  induction ctx <;> grind
+
+@[simp, grind =]
+theorem Context.cons_remove_eq {x v} {ctx : Context}:
+  (x, v) :: ctx ≈ (x, v) :: Context.remove x ctx
+:= by
+  intro y
+  simp
+  grind
+
+@[simp]
+theorem Context.remove_app {x : Var} {ctx1 ctx2 : Context} :
+  (ctx1 ++ ctx2).remove x = ctx1.remove x ++ ctx2.remove x
+:= by
+  induction ctx1 <;> grind
+
+@[simp]
+theorem Context.remove_equiv {x : Var} {ctx1 ctx2 : Context} :
+  ctx1 ≈ ctx2 → ctx1.remove x ≈ ctx2.remove x
+:= by
+  simp [Context.equiv]
+  intro E v
+  simp [E]
+
+@[simp]
+theorem Context.remove_disjoint {x : Var} {ctx1 ctx2 : Context} :
+  Context.disjoint ctx1 ctx2 → Context.disjoint (ctx1.remove x) (ctx2.remove x)
+:= by
+  intro D v H
+  cases E: (ctx2.remove x).lookup v with
+  | none => simp
+  | some _ =>
+    unfold Context.disjoint at D
+    simp_all
+
+@[simp, grind =]
+theorem Context.disjoint_equiv_app {ctx1 ctx2: Context} :
+  Context.disjoint ctx1 ctx2 → (ctx1 ++ ctx2) ≈ (ctx2 ++ ctx1)
+:= by
+  simp [disjoint]
+  grind
+
+end MSubst
+
+open MSubst
+
+section MSubst
+
+@[grind]
+def Lang.Term.isubst (ctx : Context) (t: Term): Term :=
+  match t with
+  | .val v => v
+  | .var x =>
+    match ctx.lookup x with
+    | some v => v
+    | none => t
+  | .fun x t1 =>
+       .fun x (isubst (ctx.remove x) t1)
+  | .fix f x t1 =>
+       .fix f x (isubst ((ctx.remove f).remove x) t1)
+  | .if t0 t1 t2 =>
+       .if (isubst ctx t0) (isubst ctx t1) (isubst ctx t2)
+  | .seq t1 t2 =>
+       .seq (isubst ctx t1) (isubst ctx t2)
+  | .let x t1 t2 =>
+       .let x (isubst ctx t1) (isubst (ctx.remove x) t2)
+  | .app t1 t2 =>
+       .app (isubst ctx t1) (isubst ctx t2)
+
+@[simp, grind =]
+theorem Lang.Term.isubst_nil {t: Term}:
+  t.isubst [] = t
+:= by
+  induction t using Term.ind <;> grind
+
+@[grind .]
+theorem Lang.Term.isubst_cons {t: Term} {ctx: Context} {x: Var} {v: Val}:
+  t.isubst ((x, v) :: ctx) = (t.subst x v).isubst ctx
+:= by
+  induction t using Term.ind generalizing ctx <;> try grind
+
+@[simp, grind =]
+theorem Lang.Term.isubst_single {t: Term} {x: Var} {v: Val}:
+  t.isubst [(x, v)] = t.subst x v
+:= by
+  induction t using Term.ind <;> grind
+
+@[grind .]
+theorem Lang.Term.isubst_ctx_eq {t: Term} {ctx1 ctx2: Context}:
+  ctx1 ≈ ctx2 → t.isubst ctx1 = t.isubst ctx2
+:= by
+  intro E
+  induction t using Term.ind generalizing ctx1 ctx2 <;> try grind
+  case var x =>
+    simp_all
+    grind
+  case «fun» x t IH =>
+    simp only [Lang.Term.isubst]
+    solve_by_elim [Context.remove_equiv]
+  case fix f x t IH =>
+    simp only [Lang.Term.isubst]
+    solve_by_elim [Context.remove_equiv]
+  case «let» x t1 t2 IH1 IH2 =>
+    simp only [Lang.Term.isubst]
+    simp
+    and_intros
+    . apply IH1 E
+    . apply IH2 (Context.remove_equiv E)
+
+@[grind =]
+theorem Lang.Term.isubst_app {t: Term} {ctx1 ctx2: Context}:
+  t.isubst (ctx1 ++ ctx2) = (t.isubst ctx1).isubst ctx2
+:= by
+  induction t using Term.ind generalizing ctx1 ctx2 <;> try grind
+
+@[grind =]
+theorem Lang.Term.isubst_app_swap {t: Term} {ctx1 ctx2: Context}:
+  ctx1.disjoint ctx2 →
+  t.isubst (ctx1 ++ ctx2) = t.isubst (ctx2 ++ ctx1)
+:= by
+  intro H
+  apply Term.isubst_ctx_eq
+  apply Context.disjoint_equiv_app
+  exact H
+
+@[grind =]
+theorem Lang.Term.isubst_remove {t: Term} {ctx: Context} {x v}:
+  t.isubst ((x, v) :: ctx) = (t.isubst (ctx.remove x)).subst x v
+:= by
+  rw [←Term.isubst_single]
+  rw [←Term.isubst_app]
+  rw [Term.isubst_app_swap]
+  . apply Term.isubst_ctx_eq
+    apply Context.cons_remove_eq
+  . grind
+
+@[grind =]
+theorem Lang.Term.isubst_remove2 {t: Term} {ctx: Context} {f vf x vx}:
+  t.isubst ((f, vf) :: (x, vx) :: ctx) = ((t.isubst <| (ctx.remove f).remove x).subst f vf).subst x vx
+:= by
+  repeat rw [←Term.isubst_single]
+  repeat rw [←Term.isubst_app]
+  rw [Term.isubst_app_swap]
+  . apply Term.isubst_ctx_eq
+    intro y
+    simp
+    grind
+  . grind
+
+end MSubst
+
+section MKStruct
+
+/--
+`Formula: (Val → HProp) → HProp` is intended to be a function that
+`F Q` is the weakest precondition.
+-/
+abbrev Formula := (Val → HProp) → HProp
+
+@[grind]
+def mkStruct (F: Formula): Formula :=
+  fun Q => \∃ Q', F Q' ** (Q' -** Q)
+
+@[simp, grind .]
+theorem mkStruct.ramified {Q1 Q2 F}:
+  (mkStruct F Q1) ** (Q1 -** Q2) ==> (mkStruct F Q2)
+:= by
+  unfold mkStruct
+  xsimp
+
+@[simp, grind .]
+theorem mkStruct.erase {Q F}:
+  F Q ==> mkStruct F Q
+:= by
+  unfold mkStruct
+  xsimp
+
+@[simp, grind =]
+theorem mkStruct.eq_wp {t: Term}:
+  mkStruct (WP t) = WP t
+:= by
+  funext Q
+  ext
+  . simp [mkStruct]
+    intro Q'
+    apply WP.ramified
+  . apply mkStruct.erase
+
+@[grind .]
+theorem mkStruct.conseq {F Q1 Q2}:
+  Q1 ===> Q2 →
+  mkStruct F Q1 ==> mkStruct F Q2
+:= by
+  intro H
+  unfold mkStruct
+  xpull
+  intros Q'
+  xsimp [Q']
+  xchange H
+  simp
+
+@[simp, grind .]
+theorem mkStruct.frame {F H Q}:
+  (mkStruct F Q) ** H ==> mkStruct F (Q *+ H)
+:= by
+  unfold mkStruct
+  xpull
+  intro Q'
+  xsimp [Q']
+  grind
+
+@[grind .]
+theorem mkStruct.monotone {F1 F2 Q}:
+  (∀ Q, F1 Q ==> F2 Q) →
+  mkStruct F1 Q ==> mkStruct F2 Q
+:= by
+  intro H
+  unfold mkStruct
+  xpull
+  intro Q'
+  xchange H
+  xsimp [Q']
+
+end MKStruct
+
+section WPGen
+
+@[grind]
+def wpgen.fail: Formula := fun _ => \[False]
+@[grind]
+def wpgen.val (v: Val): Formula := fun Q => Q v
+@[grind]
+def wpgen.fun (Fof: Val → Formula): Formula := fun Q =>
+  \∀ vf: Val, \[∀ vx Q', Fof vx Q' ==> WP (.app vf vx) Q'] -* Q vf
+@[grind]
+def wpgen.fix (Fof: Val → Val → Formula) : Formula := fun Q =>
+  \∀ vf: Val, \[∀ vx Q', Fof vf vx Q' ==> WP (.app vf vx) Q'] -* Q vf
+@[grind]
+def wpgen.var (ctx: MSubst.Context) (x: Var) : Formula :=
+  match ctx.lookup x with
+  | none => wpgen.fail
+  | some v => wpgen.val v
+@[grind]
+def wpgen.seq (F1 F2: Formula) : Formula := fun Q =>
+  F1 (fun _ => F2 Q)
+@[grind]
+def wpgen.let (F1: Formula) (F2of: Val → Formula) : Formula := fun Q =>
+  F1 (fun v => F2of v Q)
+@[grind]
+def wpgen.if (t: Term) (F1 F2: Formula) : Formula := fun Q =>
+  \∃ (b: Bool), \[t = b] ** (if b then F1 Q else F2 Q)
+@[grind]
+def wpgen.if_term (F0 F1 F2: Formula) : Formula :=
+  wpgen.let F0 (fun v => mkStruct (wpgen.if v F1 F2))
+@[grind]
+def wpgen.app (t: Term) : Formula := fun Q =>
+  \∃ H, H ** \[Triple t H Q]
+
+def wpgen (ctx: Context) (t: Term) : Formula :=
+  mkStruct <| match t with
+    | .val v => wpgen.val v
+    | .var x => wpgen.var ctx x
+    | .fun x t1 => wpgen.fun (fun v => wpgen ((x, v)::ctx) t1)
+    | .fix f x t1 => wpgen.fix (fun vf v => wpgen ((f, vf)::(x, v)::ctx) t1)
+    | .if t0 t1 t2 => wpgen.if (t0.isubst ctx) (wpgen ctx t1) (wpgen ctx t2)
+    | .seq t1 t2 => wpgen.seq (wpgen ctx t1) (wpgen ctx t2)
+    | .let x t1 t2 => wpgen.let (wpgen ctx t1) (fun v => wpgen ((x, v)::ctx) t2)
+    | .app _ _ => wpgen.app (t.isubst ctx)
+
+end WPGen
+
+section SoundnessOfWPGen
+
+@[grind]
+def Formula.sound (t: Term) (F: Formula) : Prop := ∀ Q, F Q ==> WP t Q
+
+@[simp, grind .]
+theorem WP.sound (t: Term):
+  Formula.sound t (WP t)
+:= by
+  intro Q
+  simp
+
+@[simp, grind .]
+theorem mkStruct.sound {t} {F: Formula}:
+  F.sound t →
+  (mkStruct F).sound t
+:= by
+  intro M
+  unfold Formula.sound
+  intro Q
+  rw [← mkStruct.eq_wp]
+  apply mkStruct.monotone
+  exact M
+
+@[simp, grind .]
+theorem wpgen.fail_sound {t: Term}:
+  Formula.sound t wpgen.fail
+:= by
+  intro Q
+  simp [wpgen.fail]
+  grind
+
+@[simp, grind .]
+theorem wpgen.val_sound {v: Val}:
+  Formula.sound v (wpgen.val v)
+:= by
+  intro Q
+  simp [wpgen.val]
+  apply WP.val
+
+@[grind .]
+theorem wpgen.fun_sound {x} {t1: Term} {Fof}:
+  (∀ vx, Formula.sound (t1.subst x vx) (Fof vx)) →
+  Formula.sound (.fun x t1) (wpgen.fun Fof)
+:= by
+  intro M
+  intro Q
+  unfold wpgen.fun
+  refine HProp.forall_left (x := Val.fun x t1) ?_
+  -- apply xchange_rewrite (Q := WP (Term.fun x t1) Q) (motive := fun x => x) (by hprop_eq) (HProp.imp_mp (HProp.wand_pure_left _)) (by grind)
+  xchange HProp.wand_pure_left
+  . intro vx Q'
+    specialize M vx
+    unfold Formula.sound at M
+    xchange M
+    apply WP.app_fun
+    rfl
+  . exact WP.fun
+
+@[grind .]
+theorem wpgen.fix_sound {f x} {t1: Term} {Fof}:
+  (∀ vf vx, Formula.sound (t1.subst f vf |>.subst x vx) (Fof vf vx)) →
+  Formula.sound (.fix f x t1) (wpgen.fix Fof)
+:= by
+  intro M
+  intro Q
+  unfold wpgen.fix
+  refine HProp.forall_left (x := Val.fix f x t1) ?_
+  xchange HProp.wand_pure_left
+  . intro vx Q'
+    -- `vf` is the fixed-point value for the function `f`
+    specialize M (Val.fix f x t1) vx
+    unfold Formula.sound at M
+    xchange M
+    apply WP.app_fix
+    rfl
+  . exact WP.fix
+
+@[grind .]
+theorem wpgen.seq_sound {F1 F2 t1 t2}:
+  Formula.sound t1 F1 →
+  Formula.sound t2 F2 →
+  Formula.sound (.seq t1 t2) (wpgen.seq F1 F2)
+:= by
+  intro S1 S2 Q
+  apply WP.seq.trans_r
+  unfold wpgen.seq
+  unfold Formula.sound at *
+  xchange S1
+  apply WP.conseq
+  xchange S2
+  simp
+
+@[grind .]
+theorem wpgen.let_sound {F1 F2of x t1 t2}:
+  Formula.sound t1 F1 →
+  (∀ v, Formula.sound (.subst x v t2) (F2of v)) →
+  Formula.sound (.let x t1 t2) (wpgen.let F1 F2of)
+:= by
+  intro S1 S2 Q
+  apply WP.let.trans_r
+  unfold wpgen.let
+  xchange S1 _
+  apply WP.conseq
+  xchange S2 _ _
+  simp
+
+@[grind .]
+theorem wpgen.if_sound {F1 F2 t0 t1 t2}:
+  Formula.sound t1 F1 →
+  Formula.sound t2 F2 →
+  Formula.sound (.if t0 t1 t2) (wpgen.if t0 F1 F2)
+:= by
+  intro S1 S2 Q
+  unfold wpgen.if
+  xpull
+  intro b HB
+  cases HB
+  apply WP.if.trans_r
+  split
+  . apply S1
+  . apply S2
+
+@[grind .]
+theorem wpgen.app_sound {t}:
+  Formula.sound t (wpgen.app t)
+:= by
+  intro Q
+  unfold wpgen.app
+  xsimp
+  intro H HT
+  apply WP.equiv.mpr
+  exact HT
+
+@[simp, grind .]
+theorem wpgen.sound {ctx t}:
+  Formula.sound (t.isubst ctx) (wpgen ctx t)
+:= by
+  induction t using Term.ind generalizing ctx <;> apply mkStruct.sound
+  case «fun» x t IH =>
+    apply wpgen.fun_sound
+    grind
+  case fix f x t IH =>
+    apply wpgen.fix_sound
+    grind
+  case «let» x t1 t2 IH1 IH2 =>
+    apply wpgen.let_sound
+    . grind
+    . grind
+  all_goals grind
+
+@[simp, grind .]
+theorem wpgen.nil_sound {t Q}:
+  wpgen [] t Q ==> WP t Q
+:= by
+  let H := wpgen.sound (ctx := []) (t := t)
+  simp at H
+  apply H
+
+@[grind .]
+theorem Triple.of_wpgen {t H Q}:
+  H ==> wpgen [] t Q →
+  Triple t H Q
+:= by
+  intro M
+  rw [← WP.equiv]
+  xchange M
+  apply wpgen.nil_sound
+
+end SoundnessOfWPGen
