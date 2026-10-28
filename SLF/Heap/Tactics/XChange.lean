@@ -196,7 +196,7 @@ scoped elab "xchange_rewrite_core" ltr:(dir)? M:term : tactic => withMainContext
     | some x => interpDir x
     | none => true
   let goal ← getMainGoalQ
-  let ⟨lhs, rhs⟩ ← parseHPropImp goal
+  let ⟨lhs, _rhs⟩ ← parseHPropImp goal
   -- get the type of M
   let M ← elabTerm M none
   let mut ty: Q(Prop) ← inferType M
@@ -211,13 +211,12 @@ scoped elab "xchange_rewrite_core" ltr:(dir)? M:term : tactic => withMainContext
       throwError m!"unexpected type: {ty}"
   let some motive ← xchange_motive lhs lhs' | throwError m!"no motive found: {lhs} - {lhs'}"
   let motive ← delabNoPP motive
-  let rhs ← delabNoPP rhs
   let M ← delabNoPP M
   let stx ← match stx with
     | none => pure M
     | some x => `($x $M)
   evalTactic <|
-    ← `(tactic| apply xchange_rewrite (Q := $rhs) (motive := $motive) (by hprop_eq) ($stx) ; try grind)
+    ← `(tactic| refine xchange_rewrite (motive := $motive) (by hprop_eq) ($stx) (by grind) ?_)
 
 #try {H1 H2 H2' H3 H4}:
   H2 ==> H2' →
@@ -359,7 +358,7 @@ scoped elab_rules: tactic
   | ~q($C ===> $D) => do
     let id: TSyntax `ident ← match x with
       | some x => pure x
-      | none => pure <| mkIdent `x
+      | none => `(ident| x)
     `(tactic| intro $id:ident <;> (try simp) <;> xchange_rewrite $ltr $t <;> revert $id)
   | _ =>
     if goal.isForall then
