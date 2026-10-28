@@ -22,7 +22,7 @@ theorem XSimp.change_hla {Hla Hla' Hlw Hlt HR}:
   grind
 
 def XHelpers.changeHla (Hs: Q(HProp)): MetaM (TSyntax `tactic) := do
-  let stx ← PrettyPrinter.delab Hs
+  let stx ← delabNoPP Hs
   `(tactic|
     apply XSimp.change_hla (Hla' := $stx) (by hprop_eq [XSimp])
   )
@@ -35,7 +35,7 @@ theorem XSimp.change_hlw {Hla Hlw Hlw' Hlt HR}:
   grind
 
 def XHelpers.changeHlw (Hs: Q(HProp)): MetaM (TSyntax `tactic) := do
-  let stx ← PrettyPrinter.delab Hs
+  let stx ← delabNoPP Hs
   `(tactic|
     apply XSimp.change_hlw (Hlw' := $stx) (by hprop_eq [XSimp])
   )

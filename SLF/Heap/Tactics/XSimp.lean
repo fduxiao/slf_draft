@@ -238,7 +238,7 @@ scoped elab "xsimp_step_lr" : tactic => withMainContext do
             | _ =>
               `(tactic| xsimp_flip_acc_l <;> apply XSimp.lr_qwand <;> intro _)
         | ~q(HProp.forall _) =>
-          `(tactic| xsimp_flip_acc_l <;> apply XSimp.lr_hforall <;> intro _)
+          `(tactic| xsimp_flip_acc_l <;> apply XSimp.lr_forall <;> intro _)
         | _ =>
           if H1.isMVar then
             `(tactic| apply XSimp.lr_eq (by simp <;> rfl))
@@ -363,10 +363,16 @@ end XSimpPost
 
 section XSimpTactic
 
-scoped macro "xsimp": tactic => `(tactic|
+/--
+The same as `xsimp` but does not do a `simp` at the end.
+-/
+scoped macro "xsimp'": tactic => `(tactic|
   (tactic_mark <;> xsimp_start <;> (repeat' xsimp_step) <;> xsimp_post; clear_mark')
 )
 
+scoped macro "xsimp": tactic => `(tactic| xsimp' <;> try simp)
+
+scoped macro "xsimp'" "[" ts:term,+ "]"?: tactic => `(tactic| xsimp_hint_put $[$ts],* <;> xsimp')
 scoped macro "xsimp" "[" ts:term,+ "]"?: tactic => `(tactic| xsimp_hint_put $[$ts],* <;> xsimp)
 
 end XSimpTactic
@@ -490,7 +496,7 @@ example {H1 H2 H3 H4}:
 #try {H1 H2 H4} {p}:
   H1 ** (p ~~> 3) ==> H2 ** \∃ (n: Int), (p ~~> n ** \[n > 0]) ** H4
 := by
-  xsimp
+  xsimp'
   . guard_target =~ (3: Int) > 0
     sorry
   . guard_target = H1 ==> H2 ** H4
@@ -500,7 +506,7 @@ example {p}:
   p ~~> 3 ==>
   \∃ (n: Int), (p ~~> n ** \[n > 0])
 := by
-  xsimp
+  xsimp'
   guard_target =~ (3: Int) > 0
   lia
 
@@ -568,7 +574,7 @@ example {H}:
   guard_target = ∀ (n : Int), p ~~> [slf| [n] ] ==> \∃ m, p ~~> [slf| [(m + 1: Int)] ]
   intro n
   guard_target = p ~~> [slf| [n] ] ==> \∃ m, p ~~> [slf| [(m + 1: Int)] ]
-  xsimp [n-1]
+  xsimp' [n-1]
   guard_target = n = n - 1 + 1
   lia
 

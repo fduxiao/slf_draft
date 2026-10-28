@@ -194,7 +194,7 @@ scoped elab "xsimp_step_r_core": tactic => withMainContext do
     | ~q($H1 ** $H2) => `(tactic| rw [XSimp.right_flatten])
     | ~q($H -* $H') =>
       match H with
-      | ~q(\[$P]) => throwError m!"don't cancel out cause \\[{P}] might contain a contradiction"
+      | ~q(\[$P]) => `(tactic| apply XSimp.right_keep)
       | _ =>
         if H' == H then
           `(tactic| apply XSimp.right_wand_same)
@@ -235,10 +235,18 @@ scoped elab "xsimp_step_r_core": tactic => withMainContext do
       else
         `(tactic | first | xsimp_cancel_same $stx | xsimp_hook $stx | apply XSimp.right_keep)
 
-macro "xsimp_step_r" : tactic => `(tactic| xsimp_step_r_core <;> xsimp_hint_clear)
+scoped macro "xsimp_step_r" : tactic => `(tactic| xsimp_step_r_core <;> xsimp_hint_clear)
 end XSimpRStepCore
 
 section Examples
+
+open Lang in
+example (p: Loc) (n: Int):
+  XSimp (p ~~> (n + 1: Int) ** \[], \[], \[]) (\[], \[], p ~~> (n + 1: Int) ** \[])
+:= by
+  xsimp_step_r
+  guard_target = XSimp (\[], \[], \[]) (\[], \[], \[])
+  simp [XSimp]
 
 example {H1 H2 H3}:
   H1 ** \GC ** H2 ** H3 ==> H1 ** \GC ** H2 ** H3
