@@ -389,13 +389,13 @@ theorem wpgen.fun_sound {x} {t1: Term} {Fof}:
   refine HProp.forall_left (x := Val.fun x t1) ?_
   -- apply xchange_rewrite (Q := WP (Term.fun x t1) Q) (motive := fun x => x) (by hprop_eq) (HProp.imp_mp (HProp.wand_pure_left _)) (by grind)
   xchange HProp.wand_pure_left
+  . exact WP.fun
   . intro vx Q'
     specialize M vx
     unfold Formula.sound at M
     xchange M
     apply WP.app_fun
     rfl
-  . exact WP.fun
 
 @[grind .]
 theorem wpgen.fix_sound {f x} {t1: Term} {Fof}:
@@ -407,6 +407,7 @@ theorem wpgen.fix_sound {f x} {t1: Term} {Fof}:
   unfold wpgen.fix
   refine HProp.forall_left (x := Val.fix f x t1) ?_
   xchange HProp.wand_pure_left
+  . exact WP.fix
   . intro vx Q'
     -- `vf` is the fixed-point value for the function `f`
     specialize M (Val.fix f x t1) vx
@@ -414,7 +415,6 @@ theorem wpgen.fix_sound {f x} {t1: Term} {Fof}:
     xchange M
     apply WP.app_fix
     rfl
-  . exact WP.fix
 
 @[grind .]
 theorem wpgen.seq_sound {F1 F2 t1 t2}:

@@ -115,7 +115,7 @@ theorem XSimp.right_top_drop {Hra Hrg Hrt HL}:
 := by
   apply XSimp.right_gc_drop
 
-theorem XSimp.right_exists  {α} {x:α} {J:α → HProp} {Hra Hrg Hrt HL}:
+theorem XSimp.right_exists {α} {x:α} {J:α → HProp} {Hra Hrg Hrt HL}:
   XSimp HL (Hra, Hrg, (J x ** Hrt)) →
   XSimp HL (Hra, Hrg, (\∃[J] ** Hrt))
 := by
@@ -200,7 +200,7 @@ scoped elab "xsimp_step_r_core": tactic => withMainContext do
           `(tactic| apply XSimp.right_wand_same)
         else
           -- fall back to the default tactic
-          let stx ← delabNoPP H
+          let stx ← Term.exprToSyntax H
           `(tactic | first | xsimp_hook $stx | apply XSimp.right_keep)
     | ~q(HProp.exists $P) =>
       let boundVar: TSyntax `term ←
@@ -218,9 +218,15 @@ scoped elab "xsimp_step_r_core": tactic => withMainContext do
         else
           `(tactic| first | apply XSimp.right_exists)
       | some v =>
-        -- This `v` should be put with notations
-        let stx ← PrettyPrinter.delab v
-        `(tactic| apply XSimp.right_exists (x := $stx))
+        let T ← inferType P  -- `T` should be some `α → HProp`
+        if ! T.isForall then
+          throwError m!"expected a forall type for exists, got {T}"
+        let α ← Term.exprToSyntax T.bindingDomain!
+        let v ← match v with
+          | ~q(Box.new $v) => pure v
+          | _ => Meta.whnf q(Box.value $v)
+        let stx ← Term.exprToSyntax v
+        `(tactic| (apply XSimp.right_exists (α := $α) (x := $stx)))
     | ~q(\GC) => gcOrTop Hrg H
     | ~q(\Top) => gcOrTop Hrg H
     | ~q(Protect $H) => `(tactic| apply XSimp.right_keep)
@@ -229,7 +235,7 @@ scoped elab "xsimp_step_r_core": tactic => withMainContext do
       -- I don't understand the usage of `repr` now, so let's just throw an error.
       throwError m!"unexpected repr structure {p} ~> {v}"
     | _ =>
-      let stx ← delabNoPP H
+      let stx ← Term.exprToSyntax H
       if H.isMVar then
         `(tactic | first | xsimp_hook $stx | apply XSimp.right_keep)
       else
@@ -456,7 +462,32 @@ example {H1 H2 H3}:
   xsimp_step_r
   . guard_target = 4 > 3
     grind
-  . grind
+  . guard_target =
+      XSimp
+        (H3 ** H2 ** H1 ** \[], \[], \[])
+        (\[], \[], (H2 ** H1 ** H3) ** \[])
+    grind
+
+example {H1 H2 H3}:
+  H1 ** H2 ** H3 ==> (\∃ n: Nat, \[n > 3]) ** H2 ** H1 ** H3
+:= by
+  let x := 4
+  xsimp_hint_put x
+  have x : Bool := true  -- shadowing should not affect the xsimp_hint
+  xsimp_start
+  repeat xsimp_step_l
+  xsimp_step_r
+  guard_hyp xsimp_hint := xhint[4]
+  xsimp_step_r
+  guard_hyp xsimp_hint := xhint[]
+  xsimp_step_r
+  . guard_target = 4 > 3
+    grind
+  . guard_target =
+      XSimp
+        (H3 ** H2 ** H1 ** \[], \[], \[])
+        (\[], \[], (H2 ** H1 ** H3) ** \[])
+    grind
 
 example {H1 H2 H3}:
   H1 ** H2 ** H3 ==> (\∃ n: Nat, \[n > 3]) ** H2 ** H1 ** H3
@@ -509,9 +540,13 @@ example {H1 H2 H3}:
   xsimp_hint_put _, 2
   xsimp_start
   repeat' xsimp_step_l
-  repeat' xsimp_step_r
+  xsimp_step_r
+  xsimp_step_r
+  xsimp_step_r
+  xsimp_step_r
+  xsimp_step_r
   . clear xsimp_hint
-    guard_target =
+    guard_target =~
       XSimp (H1 ** \[], \[], \[]) (q ~~> [slf| 2 ] ** p ~~> [slf| [_] ] ** \[], \[], \[])
     sorry
   . sorry

@@ -518,7 +518,10 @@ def XHelpers.popXSimpHint!: TacticM Q(Box) := do
 scoped elab "xsimp_hint_next" x:term " => " t:tactic : tactic => withMainContext do
   let h ← XHelpers.popXSimpHint!
   -- I need the unexpander for `Box.new`
-  let stx ← PrettyPrinter.delab h
+  let h: Expr ← match h with
+    | ~q(Box.new $x) => pure x
+    | _ => Meta.whnf q(Box.value $h)
+  let stx ← Term.exprToSyntax h
   evalTactic <| ← match x with
   | `(_) => `(tactic| $t)
   | `($x:ident) =>
@@ -554,11 +557,13 @@ scoped elab "xsimp_has_next" : tactic => withMainContext do
 example:
   ∃ n, n = 3
 := by
-  let h := 1
-  xsimp_hint_put true, _, 3
-  guard_hyp xsimp_hint :=~ xhint[true, _, 3]
+  let x := 1
+  xsimp_hint_put x, true, _, 3
+  have x: Bool := true  -- shadowing the previous `x`
+  guard_hyp xsimp_hint :=~ xhint[1, true, _, 3]
   xsimp_hint_put 4, 6
-  guard_hyp xsimp_hint :=~ xhint[true, _, 3, 4, 6]
+  guard_hyp xsimp_hint :=~ xhint[1, true, _, 3, 4, 6]
+  xsimp_hint_next x => skip
   xsimp_hint_next x => skip
   guard_hyp xsimp_hint :=~ xhint[_, 3, 4, 6]
   xsimp_hint_next x => skip  -- we are able to detect holes

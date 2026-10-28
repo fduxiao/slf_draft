@@ -178,9 +178,9 @@ scoped elab "xchange_rewrite_try" ltr:(dir)? M:term : tactic => withMainContext 
       throwError m!"unexpected type: {ty}"
   let some motive ← xchange_motive lhs lhs' | throwError m!"no motive found: {lhs} - {lhs'}"
   logInfo m!"found motive: {motive}\n"
-  let motive ← PrettyPrinter.delab motive
-  let rhs ← PrettyPrinter.delab rhs
-  let M ← PrettyPrinter.delab M
+  let motive ← Term.exprToSyntax motive
+  let rhs ← Term.exprToSyntax rhs
+  let M ← Term.exprToSyntax M
   let stx ← match stx with
     | none => pure M
     | some x => `($x $M)
@@ -196,7 +196,7 @@ scoped elab "xchange_rewrite_core" ltr:(dir)? M:term : tactic => withMainContext
     | some x => interpDir x
     | none => true
   let goal ← getMainGoalQ
-  let ⟨lhs, _rhs⟩ ← parseHPropImp goal
+  let ⟨lhs, rhs⟩ ← parseHPropImp goal
   -- get the type of M
   let M ← elabTerm M none
   let mut ty: Q(Prop) ← inferType M
@@ -210,13 +210,14 @@ scoped elab "xchange_rewrite_core" ltr:(dir)? M:term : tactic => withMainContext
     | _ =>
       throwError m!"unexpected type: {ty}"
   let some motive ← xchange_motive lhs lhs' | throwError m!"no motive found: {lhs} - {lhs'}"
-  let motive ← delabNoPP motive
-  let M ← delabNoPP M
+  let motive ← Term.exprToSyntax motive
+  let M ← Term.exprToSyntax M
   let stx ← match stx with
     | none => pure M
     | some x => `($x $M)
+  let rhs ← Term.exprToSyntax rhs
   evalTactic <|
-    ← `(tactic| refine xchange_rewrite (motive := $motive) (by hprop_eq) ($stx) (by grind) ?_)
+    ← `(tactic| apply xchange_rewrite (Q := $rhs) (motive := $motive) (by hprop_eq) ($stx) (by grind))
 
 #try {H1 H2 H2' H3 H4}:
   H2 ==> H2' →

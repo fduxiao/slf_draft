@@ -47,8 +47,8 @@ scoped elab "hstars_flip": tactic => withMainContext do
     | ~q(\[]) :: xs => pure (xs ++ [q(\[])])
     | _ => pure stars
     let rhs ← joinStar stars
-    let lhs ← delabNoPP lhs
-    let rhs ← delabNoPP rhs
+    let lhs ← Term.exprToSyntax lhs
+    let rhs ← Term.exprToSyntax rhs
     evalTactic <| ← `(tactic| show ($lhs = $rhs) <;> hprop_eq)
   | _ => throwError "hstars_flip failed"
 
