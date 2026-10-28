@@ -507,4 +507,225 @@ theorem Triple.of_wpgen {t H Q}:
   xchange M
   apply wpgen.nil_sound
 
+@[grind .]
+theorem Triple.app_fun_from_wpgen {v1 v2 x t1 H Q}:
+  v1 = Val.fun x t1 →
+  H ==> wpgen [(x,v2)] t1 Q →
+  Triple (.app v1 v2) H Q
+:= by
+  intro M1 M2
+  apply Triple.app_fun M1
+  rw [← Term.isubst_single]
+  rw [← WP.equiv]
+  xchange M2
+  apply wpgen.sound
+
 end SoundnessOfWPGen
+
+namespace XLemmas
+
+theorem xstruct {F H Q}:
+  H ==> F Q →
+  H ==> mkStruct F Q
+:= by
+  grind
+
+theorem xval {v H Q}:
+  H ==> Q v →
+  H ==> wpgen.val v Q
+:= by
+  grind
+
+theorem xlet {H F1 F2of Q}:
+  H ==> F1 (fun v => F2of v Q) →
+  H ==> wpgen.let F1 F2of Q
+:= by
+  intro M
+  xchange M
+  grind
+
+theorem xseq {H F1 F2 Q}:
+  H ==> F1 (fun _v => F2 Q) →
+  H ==> wpgen.seq F1 F2 Q
+:= by
+  intro M
+  xchange M
+  grind
+
+theorem xif {b H F1 F2 Q}:
+  (b = true → H ==> F1 Q) →
+  (b = false → H ==> F2 Q) →
+  H ==> wpgen.if b F1 F2 Q
+:= by
+  intro M1 M2
+  unfold wpgen.if
+  xsimp [b]
+  cases b <;> simp
+  . apply M2
+    rfl
+  . apply M1
+    rfl
+
+theorem xapp {t Q1 H1 H Q}:
+  Triple t H1 Q1 →
+  H ==> H1 ** (Q1 -** Protect Q) →
+  H ==> wpgen.app t Q
+:= by
+  intro M W
+  unfold wpgen.app
+  xsimp
+  grind
+
+theorem xapp_no_protect {t Q1 H1 H Q}:
+  Triple t H1 Q1 →
+  H ==> H1 ** (Q1 -** Q) →
+  H ==> wpgen.app t Q
+:= by
+  intro M W
+  unfold wpgen.app
+  xsimp
+  grind
+
+theorem xfun_spec {S:Val → Prop} {H Q Fof}:
+  (∀ vf: Val,
+    (∀ (vx: Val) H' Q', (H' ==> Fof vx Q') → Triple (.app vf vx) H' Q') →
+    S vf) →
+  (∀ vf, S vf → (H ==> Q vf)) →
+  H ==> wpgen.fun Fof Q
+:= by
+  intro M1 M2
+  unfold wpgen.fun
+  xsimp
+  intro vf N
+  apply M2
+  apply M1
+  intro _ _ _ K
+  rw [← WP.equiv]
+  xchange K
+  apply N
+
+theorem xfun_nospec {H Q Fof}:
+  (∀ vf: Val,
+    (∀ (vx: Val) H' Q', (H' ==> Fof vx Q') → Triple (.app vf vx) H' Q') →
+    (H ==> Q vf)) →
+  H ==> wpgen.fun Fof Q
+:= by
+  intro M
+  unfold wpgen.fun
+  xsimp
+  intros vf N
+  apply M
+  intro _ _ _ K
+  rw [← WP.equiv]
+  xchange K
+  apply N
+
+theorem xfix_spec {S:Val → Prop} {H Q Fof}:
+  (∀ vf: Val,
+    (∀ (vx: Val) H' Q', (H' ==> Fof vf vx Q') → Triple (.app vf vx) H' Q') →
+    S vf) →
+  (∀ vf: Val, S vf → (H ==> Q vf)) →
+  H ==> wpgen.fix Fof Q
+:= by
+  intro M1 M2
+  unfold wpgen.fix
+  xsimp
+  intros vf N
+  apply M2
+  apply M1
+  intro _ _ _ K
+  rw [← WP.equiv]
+  xchange K
+  apply N
+
+theorem xfix_nospec_lemma {H Q Fof}:
+  (∀ vf: Val,
+     (∀ (vx: Val) H' Q', (H' ==> Fof vf vx Q') → Triple (.app vf vx) H' Q') →
+     (H ==> Q vf)) →
+  H ==> wpgen.fix Fof Q
+:= by
+  intro M
+  unfold wpgen.fix
+  xsimp
+  intros vf N
+  apply M
+  intro _ _ _ K
+  rw [← WP.equiv]
+  xchange K
+  apply N
+
+theorem xwp_fun {v1 v2 x t H Q}:
+  v1 = Val.fun x t →
+  H ==> wpgen [(x,v2)] t Q →
+  Triple (.app v1 v2) H Q
+:= by
+  intro M1 M2
+  rw [← WP.equiv]
+  xchange M2
+  xchange (wpgen.sound (ctx := [(x,v2)]) (t := t) Q)
+  simp
+  apply WP.app_fun
+  exact M1
+
+theorem xwp_fix {v1 v2 f x t H Q}:
+  v1 = Val.fix f x t →
+  f ≠ x →
+  H ==> wpgen ([(f,v1),(x,v2)]) t Q →
+  Triple (.app v1 v2) H Q
+:= by
+  intro M1 N M2
+  rw [← WP.equiv]
+  xchange M2
+  xchange (wpgen.sound (ctx := [(f,v1),(x,v2)]) (t := t) Q)
+  rw [Term.isubst_cons]
+  rw [Term.isubst_single]
+  apply WP.app_fix
+  exact M1
+
+theorem xtriple {t H} {Q: Val → HProp}:
+  H ==> mkStruct (wpgen.app t) Q →
+  Triple t H Q
+:= by
+  intro M
+  rw [← WP.equiv]
+  xchange M
+  unfold mkStruct wpgen.app
+  xpull
+  intros Q' H' N
+  rw [← WP.equiv] at N
+  xchange N
+  apply WP.ramified
+
+theorem xwp {v1 v2 x t1 H Q}:
+  v1 = Val.fun x t1 →
+  H ==> wpgen [(x,v2)] t1 Q →
+  Triple (.app v1 v2) H Q
+:= by
+  intro M1 M2
+  exact Triple.app_fun_from_wpgen M1 M2
+
+example (p: Loc) (n: Int):
+  let incr: Val := [slf|
+    vfun p =>
+       let n := !p in
+       let m := n + 1 in
+       p := m
+  ]
+  Triple (.app incr p)
+    (p ~~> n)
+    (fun _ => p ~~> (n + 1: Int))
+:= by
+  apply xwp rfl
+  apply xstruct
+  apply xlet
+  apply xstruct
+  apply xapp_no_protect (Triple.get); xsimp
+  apply xstruct
+  apply xlet
+  apply xstruct
+  apply xapp_no_protect (Triple.add); xsimp
+  apply xstruct
+  apply xapp_no_protect (Triple.set)
+  xsimp
+
+end XLemmas
