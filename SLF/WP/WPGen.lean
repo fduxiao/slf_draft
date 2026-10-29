@@ -340,6 +340,9 @@ end WPGen
 
 section SoundnessOfWPGen
 
+/--
+`sound t F` is defined to be `∀ Q, F Q ==> WP t Q`, i.e., `F Q` is the weakest precondition.
+-/
 @[grind]
 def Formula.sound (t: Term) (F: Formula) : Prop := ∀ Q, F Q ==> WP t Q
 
@@ -566,6 +569,24 @@ theorem xif {b H F1 F2 Q}:
   . apply M1
     rfl
 
+theorem xif_true {H F1 F2 Q}:
+  (H ==> F1 Q) →
+  H ==> wpgen.if true F1 F2 Q
+:= by
+  intro H
+  apply xif
+  . simp_all
+  . simp_all
+
+theorem xif_false {H F1 F2 Q}:
+  (H ==> F2 Q) →
+  H ==> wpgen.if false F1 F2 Q
+:= by
+  intro H
+  apply xif
+  . simp_all
+  . simp_all
+
 theorem xapp {t Q1 H1 H Q}:
   Triple t H1 Q1 →
   H ==> H1 ** (Q1 -** Protect Q) →
@@ -707,9 +728,9 @@ theorem xwp {v1 v2 x t1 H Q}:
 example (p: Loc) (n: Int):
   let incr: Val := [slf|
     vfun p =>
-       let n := !p in
-       let m := n + 1 in
-       p := m
+      let n := !p in
+      let m := n + 1 in
+      p := m
   ]
   Triple (.app incr p)
     (p ~~> n)
@@ -729,3 +750,333 @@ example (p: Loc) (n: Int):
   xsimp
 
 end XLemmas
+
+section Notations
+open Lean Meta Elab Tactic Parser.Tactic PrettyPrinter Delaborator SubExpr Qq
+
+-- First the notation for wpgen structures
+declare_syntax_cat xwp_code (behavior := symbol)
+syntax "[" term "]": xwp_code
+syntax "(" xwp_code ")": xwp_code
+syntax ppDedent("`(" xwp_code ")"): xwp_code
+syntax "<[" xwp_code "]>": term
+syntax "Fail": xwp_code
+syntax "Val " term: xwp_code
+syntax ppGroup("Let " ident " := " xwp_code " in ") ppDedent(ppLine xwp_code) : xwp_code
+syntax ppGroup("Seq " xwp_code " ; ") ppDedent(ppLine xwp_code) : xwp_code
+syntax "App " slf_term : xwp_code
+syntax
+  ppGroup("If " slf_term " Then ")
+    ppGroup(ppLine xwp_code)
+  ppDedent(ppLine " Else ")
+    ppGroup(ppLine xwp_code) : xwp_code
+syntax "Fun " ident " => " xwp_code : xwp_code
+syntax "Fix " ident ident " => " xwp_code : xwp_code
+
+macro_rules
+  | `(<[ [$F] ]>) => `($F)
+  | `(<[ ($F) ]>) => `(<[ $F ]>)
+  | `(<[ `($F) ]>) => `(mkStruct <[ $F ]>)
+  | `(<[ Fail ]>) => `(wpgen.fail)
+  | `(<[ Val $v ]>) => `(wpgen.val $v)
+  | `(<[ Let $x := $F1 in $F2 ]>) => `(wpgen.let <[ $F1 ]> (fun $x => <[ $F2 ]>))
+  | `(<[ Seq $F1 ; $F2 ]>) => `(wpgen.seq <[ $F1 ]> <[ $F2 ]>)
+  | `(<[ App $t ]>) => `(wpgen.app [slf| $t ])
+  | `(<[ If $t Then $F1 Else $F2 ]>) => `(wpgen.if [slf| $t] <[ $F1 ]> <[ $F2 ]>)
+  | `(<[ Fun $x => $F ]>) => `(wpgen.fun (fun $x => <[ $F ]>))
+  | `(<[ Fix $f $x => $F ]>) => `(wpgen.fix (fun $f $x => <[ $F ]>))
+
+def parseToXwp: TSyntax `term → UnexpandM (TSyntax `xwp_code)
+  | `(<[$t]>) => `(xwp_code| $t)
+  | `($t) => `(xwp_code| [$t])
+
+def parseToSlf: TSyntax `term → UnexpandM (TSyntax `slf_term)
+  | `([slf| $t]) => `(slf_term| $t)
+  | `($t) => `(slf_term| [$t])
+
+@[app_unexpander mkStruct]
+def unexpandMkStruct : Lean.PrettyPrinter.Unexpander
+  | `($_ <[ $F ]>) => `(<[ `($F) ]>)
+  | `($_ $F) => `(<[ `([$F]) ]>)
+  | _ => throw ()
+
+@[app_unexpander wpgen.fail]
+def unexpandWpgenFail : Lean.PrettyPrinter.Unexpander
+  | `($_) => `(<[ Fail ]>)
+
+@[app_unexpander wpgen.val]
+def unexpandWpgenVal : Lean.PrettyPrinter.Unexpander
+  | `($_ $v) => `(<[ Val $v ]>)
+  | _ => throw ()
+
+@[app_unexpander wpgen.let]
+def unexpandWpgenLet : Lean.PrettyPrinter.Unexpander
+  | `($_ $F1 $F2) => do
+    let F1 ← parseToXwp F1
+    match F2 with
+    | `(fun $x:ident => $F2) =>
+      let F2 ← parseToXwp F2
+      `(<[ Let $x := $F1 in $F2 ]>)
+    | _ => `(<[ Let x := $F1 in [$F2 x] ]>)
+  | _ => throw ()
+
+@[app_unexpander wpgen.seq]
+def unexpandWpgenSeq : Lean.PrettyPrinter.Unexpander
+  | `($_ $F1 $F2) => do
+    let F1 ← parseToXwp F1
+    let F2 ← parseToXwp F2
+    `(<[ Seq $F1 ; $F2 ]>)
+  | _ => throw ()
+
+@[app_unexpander wpgen.app]
+def unexpandWpgenApp : Lean.PrettyPrinter.Unexpander
+  | `($_ $t) => do
+    let t ← parseToSlf t
+    `(<[ App $t ]>)
+  | _ => throw ()
+
+@[app_unexpander wpgen.if]
+def unexpandWpgenIf : Lean.PrettyPrinter.Unexpander
+  | `($_ $t $F1 $F2) => do
+    let t ← parseToSlf t
+    let F1 ← parseToXwp F1
+    let F2 ← parseToXwp F2
+    `(<[ If $t Then $F1 Else $F2 ]>)
+  | _ => throw ()
+
+@[app_unexpander wpgen.fun]
+def unexpandWpgenFun : Lean.PrettyPrinter.Unexpander
+  | `($_ $F) => do
+    match F with
+    | `(fun $x:ident => $F) =>
+      let F ← parseToXwp F
+      `(<[ Fun $x => $F ]>)
+    | _ => `(<[ Fun x => [$F x] ]>)
+  | _ => throw ()
+
+@[app_unexpander wpgen.fix]
+def unexpandWpgenFix : Lean.PrettyPrinter.Unexpander
+  | `($_ $F) => do
+    match F with
+    | `(fun $f:ident $x:ident => $F) =>
+      let F ← parseToXwp F
+      `(<[ Fix $f $x => $F ]>)
+    | _ => `(<[ Fix f x => [$F f x] ]>)
+  | _ => throw ()
+
+namespace XWPNotationExamples
+open XLemmas
+
+def incr: Val := [slf|
+    vfun p =>
+      let n := !p in
+      let m := n + 1 in
+      p := m
+  ]
+
+theorem incr_spec (p: Loc) (n: Int):
+  Triple (.app incr p)
+    (p ~~> n)
+    (fun _ => p ~~> (n + 1: Int))
+:= by
+  apply xwp rfl; simp [wpgen, Term.isubst]
+  apply xstruct; apply xlet
+  apply xstruct; apply xapp_no_protect (Triple.get); xsimp
+  apply xstruct; apply xlet
+  apply xstruct; apply xapp_no_protect (Triple.add); xsimp
+  apply xstruct; apply xapp_no_protect (Triple.set)
+  xsimp
+
+example:
+  let succ_using_incr : Val := [slf|
+    vfun n =>
+      let r := ref n in
+      [incr] r;
+      let x := ! r in
+      free r;
+      x
+  ]
+  forall n: Int, Triple (.app succ_using_incr n)
+    \[]
+    (fun r => \[r = (n + 1: Int)])
+:= by
+  intro succ_using_incr
+  intro n
+  apply xwp rfl; simp [wpgen, Term.isubst, wpgen.var]
+  apply xstruct; apply xlet
+  apply xstruct; apply xapp_no_protect (Triple.ref); xsimp
+  intro x p E; simp_all only []
+  apply xstruct; apply xseq
+  apply xstruct; apply xapp_no_protect; (apply incr_spec _ _); (try any_goals xsimp)
+  apply xstruct; apply xlet
+  apply xstruct; apply xapp_no_protect (Triple.get); xsimp
+  apply xstruct; apply xseq
+  apply xstruct; apply xapp_no_protect (Triple.free); xsimp
+  apply xstruct; apply xval
+  xsimp
+
+def factorial: Val := [slf|
+  vfix f n =>
+    let b := n > 0 in
+    if b then
+      let n' := n - 1 in
+      let r := f n' in
+      n * r
+    else 1
+]
+
+-- Note this is not `_root_.Nat.factorial` but `Nat.factorial` in the current namespace
+def Nat.factorial: Nat → Nat
+  | 0 => 1
+  | n+1 => (n+1) * Nat.factorial n
+
+example (n: Nat):
+  Triple (.app factorial n)
+    \[]
+    (fun r => \[r = (Nat.factorial n)])
+:= by
+  induction n
+  case zero =>
+    simp [Nat.factorial]
+    apply xwp_fix rfl (by simp); simp [wpgen, Term.isubst]
+    apply xstruct; apply xlet
+    apply xstruct; apply xapp_no_protect (Triple.gt); xsimp
+    apply xstruct; apply xif_false
+    apply xstruct; apply xval; xsimp
+  case succ n IH =>
+    apply xwp_fix rfl (by simp); simp [wpgen, Term.isubst]
+    apply xstruct; apply xlet
+    apply xstruct; apply xapp_no_protect (Triple.gt); xsimp
+    apply xstruct; apply xif_true
+    apply xstruct; apply xlet
+    apply xstruct; apply xapp_no_protect (Triple.sub); xsimp
+    apply xstruct; apply xlet
+    apply xstruct; apply xapp_no_protect (IH); xsimp
+    apply xstruct; apply xapp_no_protect (Triple.mul); xsimp
+    simp [Nat.factorial]
+
+-- if
+example {n: Int} {p: Loc}:
+  let is3: Val := [slf|
+    vfun x =>
+      let v := !x in
+      let t := v == 3 in
+      if t then true else false
+  ]
+  Triple
+    (.app is3 p)
+    (p ~~> n)
+    (fun r => p ~~> n ** \[r = (n == 3)])
+:= by
+  intro is3
+  apply xwp rfl;
+  simp [wpgen, Term.isubst]
+  apply xstruct; apply xlet
+  apply xstruct; apply xapp_no_protect (Triple.get); xsimp
+  apply xstruct; apply xlet
+  apply xstruct; apply xapp_no_protect (Triple.eq); xsimp
+  apply xstruct; apply xif
+  . -- case true
+    intro H
+    simp_all
+    apply xstruct; apply xval; xsimp
+  . -- case false
+    intro H
+    simp_all
+    apply xstruct; apply xval; xsimp
+    exact H
+
+-- fun
+def createCounter: Val := [slf|
+  vfun c =>
+    let p := ref 0 in
+    fun u =>
+      [incr] p;
+      !p
+]
+
+def CounterSpec (f: Val) (p: Loc) : Prop :=
+  forall m: Int,
+    Triple [slf| [f] unit ]
+      (p ~~> m)
+      (fun r => \[r = (m + 1: Int)] ** p ~~> (m+1: Int))
+
+example:
+  Triple [slf| [createCounter] unit ]
+    \[]
+    (fun f => \∃ p, (p ~~> 0) ** \[CounterSpec f p])
+:= by
+  apply xwp_fun (rfl); simp [wpgen, Term.isubst]
+  apply xstruct; apply xlet
+  apply xstruct; apply xapp_no_protect (Triple.ref); xsimp
+  intro x p E; cases E
+  apply xstruct; apply xfun_nospec; any_goals xsimp
+  intro vf H
+  simp [CounterSpec]
+  intro m
+  apply H
+  apply xstruct; apply xseq
+  apply xstruct; apply xapp_no_protect (incr_spec _ _); (try any_goals xsimp)
+  apply xstruct; apply xapp_no_protect (Triple.get); xsimp
+
+-- fix
+def createSlowAddTo: Val := [slf|
+  vfun n =>
+    fix f x =>
+      let b := x > 0 in
+      if b then
+        let x' := x - 1 in
+        let r := f x' in
+        1 + r
+      else n
+]
+
+def SlowAddToSpec (f: Val) (n: Int) : Prop :=
+  forall x: Int,
+    Triple [slf| [f] [x] ]
+      \[x > 0]
+      (fun r => \[r = x + n])
+
+example (n: Int):
+  Triple [slf| [createSlowAddTo] [n] ]
+    \[]
+    (fun f => \[SlowAddToSpec f n])
+:= by
+  apply xwp_fun (rfl); simp [wpgen, Term.isubst]
+  apply xstruct; apply xfix_nospec_lemma
+  simp [SlowAddToSpec]
+  xsimp; simp [wpgen.var]
+  intro vf Hf vx
+  cases vx
+  case negSucc =>
+    grind
+  case ofNat nx =>
+    simp
+    induction nx
+    case zero =>
+      apply Hf; xsimp
+    case succ nx' IH =>
+      apply Hf; xsimp
+      apply xstruct; apply xlet
+      apply xstruct; apply xapp_no_protect (Triple.gt); xsimp
+      apply xstruct; apply xif_true
+      apply xstruct; apply xlet
+      apply xstruct; apply xapp_no_protect (Triple.sub); xsimp
+      apply xstruct; apply xlet
+      cases nx'
+      case zero =>
+        specialize Hf 0 \[];
+        apply xstruct; apply xapp_no_protect; apply Hf; any_goals xsimp
+        apply xstruct; apply xlet
+        apply xstruct; apply xapp_no_protect (Triple.gt); xsimp
+        apply xstruct; apply xif_false
+        intro _
+        apply xstruct; apply xval
+        apply xstruct; apply xapp_no_protect (Triple.add); xsimp
+      case succ nx' =>
+        apply xstruct; apply xapp_no_protect (IH); xsimp
+        apply xstruct; apply xapp_no_protect (Triple.add); xsimp
+        omega
+
+end XWPNotationExamples
+end Notations

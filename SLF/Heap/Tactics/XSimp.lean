@@ -436,7 +436,7 @@ example {H1 H2 H3 H4: HProp}:
   H1 ** \∃ (n: Int), (p ~~> n ** \[n > 0] ** H2) ** \[p != q] ** H3 ==> H4
 := by
   xsimp
-  guard_target = ∀ (n : Int), n > 0 → (p != q) = true → H1 ** p ~~> _ ** H2 ** H3 ==> H4
+  guard_target = ∀ (n : Int), n > 0 → ¬ (p = q) → H1 ** p ~~> _ ** H2 ** H3 ==> H4
   sorry
 
 #try {H1 H2 H3 H4 H5 H6 H7}:

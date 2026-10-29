@@ -30,10 +30,10 @@ inductive Prim: Type where
   | ge : Prim
   | gt : Prim
   | ptr_add : Prim
-  deriving Inhabited, Repr, BEq, DecidableEq
+  deriving Inhabited, Repr, BEq, DecidableEq, ReflBEq, LawfulBEq
 
 @[grind]
-def Loc: Type := Nat deriving OfNat, Inhabited, Repr, BEq, DecidableEq, HAdd
+def Loc: Type := Nat deriving OfNat, Inhabited, Repr, BEq, DecidableEq, LawfulBEq, HAdd
 
 @[simp, grind]
 def Loc.toNat (l: Loc): Nat := l
@@ -68,7 +68,7 @@ inductive Val : Type where
   | fix : Var → Var → Term → Val
   | uninit : Val
   | error : Val
-  deriving Inhabited, Repr, BEq, DecidableEq
+  deriving Inhabited, Repr
 
 
 inductive Term : Type where
@@ -83,6 +83,85 @@ inductive Term : Type where
   deriving Inhabited, Repr
 
 end
+
+mutual
+
+def Val.beq (v1 v2: Val): Bool :=
+  match v1, v2 with
+  | Val.unit, Val.unit => true
+  | Val.bool b1, Val.bool b2 => b1 == b2
+  | Val.int i1, Val.int i2 => i1 == i2
+  | Val.loc l1, Val.loc l2 => l1 == l2
+  | Val.prim p1, Val.prim p2 => p1 == p2
+  | Val.uninit, Val.uninit => true
+  | Val.error, Val.error => true
+  | Val.fun x1 t1, Val.fun x2 t2 => x1 == x2 && Term.beq t1 t2
+  | Val.fix f1 x1 t1, Val.fix f2 x2 t2 => f1 == f2 && x1 == x2 && Term.beq t1 t2
+  | _, _ => false
+
+def Term.beq (t1 t2: Term): Bool :=
+  match t1, t2 with
+  | Term.val v1, Term.val v2 => Val.beq v1 v2
+  | Term.var x1, Term.var x2 => x1 == x2
+  | Term.fun x1 t1, Term.fun x2 t2 => x1 == x2 && Term.beq t1 t2
+  | Term.fix f1 x1 t1, Term.fix f2 x2 t2 => f1 == f2 && x1 == x2 && Term.beq t1 t2
+  | Term.app t1 t2, Term.app t3 t4 => Term.beq t1 t3 && Term.beq t2 t4
+  | Term.seq t1 t2, Term.seq t3 t4 => Term.beq t1 t3 && Term.beq t2 t4
+  | Term.let x1 t1 t2, Term.let x2 t3 t4 => x1 == x2 && Term.beq t1 t3 && Term.beq t2 t4
+  | Term.if t1 t2 t3, Term.if t4 t5 t6 => Term.beq t1 t4 && Term.beq t2 t5 && Term.beq t3 t6
+  | _, _ => false
+
+end
+
+mutual
+
+theorem Val.beq_eq' {v1 v2: Val}: Val.beq v1 v2 = true ↔ v1 = v2 := by
+  cases v1 <;> (cases v2 <;> simp_all [Val.beq, Term.beq_eq'])
+  case fix =>
+    grind
+
+theorem Term.beq_eq' {t1 t2: Term}: Term.beq t1 t2 = true ↔ t1 = t2 := by
+  cases t1 <;> (cases t2 <;> simp_all [Term.beq, Val.beq_eq', Term.beq_eq'])
+  case fix =>
+    grind
+  case «let» =>
+    grind
+  case «if» =>
+    grind
+
+end
+
+instance Val.instBEq: BEq Val where
+  beq := Val.beq
+
+instance Term.instBEq: BEq Term where
+  beq := Term.beq
+
+@[simp, grind =]
+theorem Val.beq_eq {v1 v2: Val}: (v1 == v2) = true ↔ v1 = v2 := by
+  apply Val.beq_eq'
+
+@[simp, grind =]
+theorem Val.beq_eq_false {v1 v2: Val}: (v1 == v2) = false ↔ v1 ≠ v2 := by
+  grind
+
+@[simp, grind =]
+theorem Val.beq_neq {v1 v2: Val}: (v1 != v2) = true ↔ v1 ≠ v2 := by
+  unfold bne
+  grind
+
+@[simp, grind =]
+theorem Term.beq_eq {t1 t2: Term}: (t1 == t2) = true ↔ t1 = t2 := by
+  apply Term.beq_eq'
+
+@[simp, grind =]
+theorem Term.beq_eq_false {t1 t2: Term}: (t1 == t2) = false ↔ t1 ≠ t2 := by
+  grind
+
+@[simp, grind =]
+theorem Term.beq_neq {t1 t2: Term}: (t1 != t2) = true ↔ t1 ≠ t2 := by
+  unfold bne
+  grind
 
 def Term.ind.{u} {motive: Term → Sort u}
   (val : ∀ v, motive (Term.val v))
