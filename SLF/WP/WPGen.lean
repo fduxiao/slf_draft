@@ -510,19 +510,6 @@ theorem Triple.of_wpgen {t H Q}:
   xchange M
   apply wpgen.nil_sound
 
-@[grind .]
-theorem Triple.app_fun_from_wpgen {v1 v2 x t1 H Q}:
-  v1 = Val.fun x t1 →
-  H ==> wpgen [(x,v2)] t1 Q →
-  Triple (.app v1 v2) H Q
-:= by
-  intro M1 M2
-  apply Triple.app_fun M1
-  rw [← Term.isubst_single]
-  rw [← WP.equiv]
-  xchange M2
-  apply wpgen.sound
-
 end SoundnessOfWPGen
 
 namespace XLemmas
@@ -587,7 +574,7 @@ theorem xif_false {H F1 F2 Q}:
   . simp_all
   . simp_all
 
-theorem xapp {t Q1 H1 H Q}:
+theorem xapp_protect {t Q1 H1 H Q}:
   Triple t H1 Q1 →
   H ==> H1 ** (Q1 -** Protect Q) →
   H ==> wpgen.app t Q
@@ -597,7 +584,7 @@ theorem xapp {t Q1 H1 H Q}:
   xsimp
   grind
 
-theorem xapp_no_protect {t Q1 H1 H Q}:
+theorem xapp {t Q1 H1 H Q}:
   Triple t H1 Q1 →
   H ==> H1 ** (Q1 -** Q) →
   H ==> wpgen.app t Q
@@ -659,7 +646,7 @@ theorem xfix_spec {S:Val → Prop} {H Q Fof}:
   xchange K
   apply N
 
-theorem xfix_nospec_lemma {H Q Fof}:
+theorem xfix_nospec {H Q Fof}:
   (∀ vf: Val,
      (∀ (vx: Val) H' Q', (H' ==> Fof vf vx Q') → Triple (.app vf vx) H' Q') →
      (H ==> Q vf)) →
@@ -717,14 +704,6 @@ theorem xtriple {t H} {Q: Val → HProp}:
   xchange N
   apply WP.ramified
 
-theorem xwp {v1 v2 x t1 H Q}:
-  v1 = Val.fun x t1 →
-  H ==> wpgen [(x,v2)] t1 Q →
-  Triple (.app v1 v2) H Q
-:= by
-  intro M1 M2
-  exact Triple.app_fun_from_wpgen M1 M2
-
 example (p: Loc) (n: Int):
   let incr: Val := [slf|
     vfun p =>
@@ -736,17 +715,17 @@ example (p: Loc) (n: Int):
     (p ~~> n)
     (fun _ => p ~~> (n + 1: Int))
 := by
-  apply xwp rfl
+  apply xwp_fun rfl
   apply xstruct
   apply xlet
   apply xstruct
-  apply xapp_no_protect (Triple.get); xsimp
+  apply xapp (Triple.get); xsimp
   apply xstruct
   apply xlet
   apply xstruct
-  apply xapp_no_protect (Triple.add); xsimp
+  apply xapp (Triple.add); xsimp
   apply xstruct
-  apply xapp_no_protect (Triple.set)
+  apply xapp (Triple.set)
   xsimp
 
 end XLemmas
@@ -864,7 +843,7 @@ def unexpandWpgenFix : Lean.PrettyPrinter.Unexpander
     | _ => `(<[ Fix f x => [$F f x] ]>)
   | _ => throw ()
 
-namespace XWPNotationExamples
+namespace WPGen.XWPNotationExamples
 open XLemmas
 
 def incr: Val := [slf|
@@ -879,39 +858,40 @@ theorem incr_spec (p: Loc) (n: Int):
     (p ~~> n)
     (fun _ => p ~~> (n + 1: Int))
 := by
-  apply xwp rfl; simp [wpgen, Term.isubst]
+  apply xwp_fun rfl; simp [wpgen, Term.isubst]
   apply xstruct; apply xlet
-  apply xstruct; apply xapp_no_protect (Triple.get); xsimp
+  apply xstruct; apply xapp (Triple.get); xsimp
   apply xstruct; apply xlet
-  apply xstruct; apply xapp_no_protect (Triple.add); xsimp
-  apply xstruct; apply xapp_no_protect (Triple.set)
+  apply xstruct; apply xapp (Triple.add); xsimp
+  apply xstruct; apply xapp (Triple.set)
   xsimp
 
+def succ_using_incr : Val := [slf|
+  vfun n =>
+    let r := ref n in
+    [incr] r;
+    let x := ! r in
+    free r;
+    x
+]
+
 example:
-  let succ_using_incr : Val := [slf|
-    vfun n =>
-      let r := ref n in
-      [incr] r;
-      let x := ! r in
-      free r;
-      x
-  ]
   forall n: Int, Triple (.app succ_using_incr n)
     \[]
     (fun r => \[r = (n + 1: Int)])
 := by
   intro succ_using_incr
   intro n
-  apply xwp rfl; simp [wpgen, Term.isubst, wpgen.var]
+  apply xwp_fun rfl; simp [wpgen, Term.isubst, wpgen.var]
   apply xstruct; apply xlet
-  apply xstruct; apply xapp_no_protect (Triple.ref); xsimp
+  apply xstruct; apply xapp (Triple.ref); xsimp
   intro x p E; simp_all only []
   apply xstruct; apply xseq
-  apply xstruct; apply xapp_no_protect; (apply incr_spec _ _); (try any_goals xsimp)
+  apply xstruct; apply xapp; (apply incr_spec _ _); (try any_goals xsimp)
   apply xstruct; apply xlet
-  apply xstruct; apply xapp_no_protect (Triple.get); xsimp
+  apply xstruct; apply xapp (Triple.get); xsimp
   apply xstruct; apply xseq
-  apply xstruct; apply xapp_no_protect (Triple.free); xsimp
+  apply xstruct; apply xapp (Triple.free); xsimp
   apply xstruct; apply xval
   xsimp
 
@@ -940,19 +920,19 @@ example (n: Nat):
     simp [Nat.factorial]
     apply xwp_fix rfl (by simp); simp [wpgen, Term.isubst]
     apply xstruct; apply xlet
-    apply xstruct; apply xapp_no_protect (Triple.gt); xsimp
+    apply xstruct; apply xapp (Triple.gt); xsimp
     apply xstruct; apply xif_false
     apply xstruct; apply xval; xsimp
   case succ n IH =>
     apply xwp_fix rfl (by simp); simp [wpgen, Term.isubst]
     apply xstruct; apply xlet
-    apply xstruct; apply xapp_no_protect (Triple.gt); xsimp
+    apply xstruct; apply xapp (Triple.gt); xsimp
     apply xstruct; apply xif_true
     apply xstruct; apply xlet
-    apply xstruct; apply xapp_no_protect (Triple.sub); xsimp
+    apply xstruct; apply xapp (Triple.sub); xsimp
     apply xstruct; apply xlet
-    apply xstruct; apply xapp_no_protect (IH); xsimp
-    apply xstruct; apply xapp_no_protect (Triple.mul); xsimp
+    apply xstruct; apply xapp (IH); xsimp
+    apply xstruct; apply xapp (Triple.mul); xsimp
     simp [Nat.factorial]
 
 -- if
@@ -969,12 +949,12 @@ example {n: Int} {p: Loc}:
     (fun r => p ~~> n ** \[r = (n == 3)])
 := by
   intro is3
-  apply xwp rfl;
+  apply xwp_fun rfl;
   simp [wpgen, Term.isubst]
   apply xstruct; apply xlet
-  apply xstruct; apply xapp_no_protect (Triple.get); xsimp
+  apply xstruct; apply xapp (Triple.get); xsimp
   apply xstruct; apply xlet
-  apply xstruct; apply xapp_no_protect (Triple.eq); xsimp
+  apply xstruct; apply xapp (Triple.eq); xsimp
   apply xstruct; apply xif
   . -- case true
     intro H
@@ -1008,7 +988,7 @@ example:
 := by
   apply xwp_fun (rfl); simp [wpgen, Term.isubst]
   apply xstruct; apply xlet
-  apply xstruct; apply xapp_no_protect (Triple.ref); xsimp
+  apply xstruct; apply xapp (Triple.ref); xsimp
   intro x p E; cases E
   apply xstruct; apply xfun_nospec; any_goals xsimp
   intro vf H
@@ -1016,8 +996,8 @@ example:
   intro m
   apply H
   apply xstruct; apply xseq
-  apply xstruct; apply xapp_no_protect (incr_spec _ _); (try any_goals xsimp)
-  apply xstruct; apply xapp_no_protect (Triple.get); xsimp
+  apply xstruct; apply xapp (incr_spec _ _); (try any_goals xsimp)
+  apply xstruct; apply xapp (Triple.get); xsimp
 
 -- fix
 def createSlowAddTo: Val := [slf|
@@ -1043,7 +1023,7 @@ example (n: Int):
     (fun f => \[SlowAddToSpec f n])
 := by
   apply xwp_fun (rfl); simp [wpgen, Term.isubst]
-  apply xstruct; apply xfix_nospec_lemma
+  apply xstruct; apply xfix_nospec
   simp [SlowAddToSpec]
   xsimp; simp [wpgen.var]
   intro vf Hf vx
@@ -1058,25 +1038,25 @@ example (n: Int):
     case succ nx' IH =>
       apply Hf; xsimp
       apply xstruct; apply xlet
-      apply xstruct; apply xapp_no_protect (Triple.gt); xsimp
+      apply xstruct; apply xapp (Triple.gt); xsimp
       apply xstruct; apply xif_true
       apply xstruct; apply xlet
-      apply xstruct; apply xapp_no_protect (Triple.sub); xsimp
+      apply xstruct; apply xapp (Triple.sub); xsimp
       apply xstruct; apply xlet
       cases nx'
       case zero =>
         specialize Hf 0 \[];
-        apply xstruct; apply xapp_no_protect; apply Hf; any_goals xsimp
+        apply xstruct; apply xapp; apply Hf; any_goals xsimp
         apply xstruct; apply xlet
-        apply xstruct; apply xapp_no_protect (Triple.gt); xsimp
+        apply xstruct; apply xapp (Triple.gt); xsimp
         apply xstruct; apply xif_false
         intro _
         apply xstruct; apply xval
-        apply xstruct; apply xapp_no_protect (Triple.add); xsimp
+        apply xstruct; apply xapp (Triple.add); xsimp
       case succ nx' =>
-        apply xstruct; apply xapp_no_protect (IH); xsimp
-        apply xstruct; apply xapp_no_protect (Triple.add); xsimp
+        apply xstruct; apply xapp (IH); xsimp
+        apply xstruct; apply xapp (Triple.add); xsimp
         omega
 
-end XWPNotationExamples
+end WPGen.XWPNotationExamples
 end Notations
