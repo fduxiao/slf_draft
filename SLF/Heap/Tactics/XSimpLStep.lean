@@ -250,7 +250,7 @@ scoped elab "xsimp_step_l_core" c:bool v:bool : tactic => withMainContext do
               let t ← changeHla Hs.get!
               `(tactic| $t <;> apply XSimp.left_cancel_wand)
         else
-        `(tactic| apply XSimp.left_keep_wand)
+          `(tactic| apply XSimp.left_keep_wand)
     | ~q(($Hla, (($Q1 -** $Q2) ** $Hlw), \[])) =>
       if cancel_wands then
         let Hs ← searchFor? (λ h => if h.isApp then isDefEqOpaque h.appFn! Q1 else pure false) Hla

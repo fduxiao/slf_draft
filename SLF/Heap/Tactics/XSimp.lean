@@ -330,11 +330,12 @@ example {Q1 Q2 Q': Val → HProp}:
   guard_target = H1 ** p ~~> [slf| [n] ] ** H2 ** H3 ** \[] ==> (H4 ** \[]) ** \[]
   sorry
 
-scoped macro "xsimp_step" b:bool : tactic => `(tactic|
-  first | xsimp_step_l $b | xsimp_step_r| xsimp_step_lr
-)
+scoped syntax "xsimp_step" (bool)?: tactic
+scoped macro_rules
+  | `(tactic| xsimp_step $b:bool) =>
+    `(tactic| first | xsimp_step_l $b | xsimp_step_r| xsimp_step_lr)
+  | `(tactic| xsimp_step) => `(tactic| xsimp_step true)
 
-scoped macro "xsimp_step" : tactic => `(tactic| xsimp_step true)
 
 end TheTactic
 end XSimpLRStep
@@ -366,14 +367,24 @@ section XSimpTactic
 /--
 The same as `xsimp` but does not do a `simp` at the end.
 -/
-scoped macro "xsimp'": tactic => `(tactic|
-  (tactic_mark <;> xsimp_start <;> (repeat' xsimp_step) <;> xsimp_post; clear_mark')
-)
+scoped macro "xsimp_core" cancel_wand:(bool)?: tactic => do
+  `(tactic|
+    (tactic_mark <;> xsimp_start <;> (repeat' xsimp_step $[$cancel_wand:bool]?) <;> xsimp_post; clear_mark')
+  )
 
-scoped macro "xsimp": tactic => `(tactic| xsimp' <;> try simp)
+scoped syntax "xsimp' " ("(" "cancel_wands" " := " bool ")")? ("[" term,* "]")?: tactic
+scoped macro_rules
+  | `(tactic| xsimp' $[ ( cancel_wands := $b) ]? [ ]) =>
+    `(tactic| xsimp_core $[$b]?)
+  | `(tactic| xsimp' $[ ( cancel_wands := $b) ]? [ $[$ts:term],* ]) =>
+    `(tactic| xsimp_hint_put $[$ts],* <;> xsimp_core $[$b]?)
+  | `(tactic| xsimp' $[ ( cancel_wands := $b) ]?) =>
+    `(tactic| xsimp_core $[$b]?)
 
-scoped macro "xsimp'" "[" ts:term,+ "]"?: tactic => `(tactic| xsimp_hint_put $[$ts],* <;> xsimp')
-scoped macro "xsimp" "[" ts:term,+ "]"?: tactic => `(tactic| xsimp_hint_put $[$ts],* <;> xsimp)
+scoped syntax "xsimp " ("(" "cancel_wands" " := " bool ")")? ("[" term,* "]")?: tactic
+scoped macro_rules
+  | `(tactic| xsimp $[ ( cancel_wands := $b) ]? $[[ $[$ts:term],* ]]?) =>
+    `(tactic| xsimp' $[ ( cancel_wands := $b) ]? $[ [$[$ts],* ] ]? <;> try simp)
 
 end XSimpTactic
 
@@ -458,6 +469,21 @@ example {H1 H2 H3 H4}:
 := by
   xsimp
 
+-- test cancel_wands
+#try {H1 H2 H3: HProp} (n:Int):
+  H1 ** (H1 -* H2) ==> H3
+:= by
+  xsimp (cancel_wands := true)
+  guard_target = H2 ==> H3
+  sorry
+
+#try {H1 H2 H3: HProp} (n:Int):
+  H1 ** (H1 -* H2) ==> H3
+:= by
+  xsimp (cancel_wands := false)
+  guard_target = H1 ** (H1 -* H2) ==> H3
+  sorry
+
 #try {H1 H2 H3} {n: Int}:
   H1 ==> H2 ** \[n > 0] ** H3
 := by
@@ -506,7 +532,8 @@ example {p}:
   p ~~> 3 ==>
   \∃ (n: Int), (p ~~> n ** \[n > 0])
 := by
-  xsimp'
+  -- `xsimp' []` will not cause any issues even if the list is empty
+  xsimp' []
   guard_target =~ (3: Int) > 0
   lia
 
@@ -514,7 +541,8 @@ example {p q}:
   p ~~> 3 ** q ~~> 3 ==>
   \∃ (n: Int), p ~~> n ** q ~~> n
 := by
-  xsimp
+  -- empty list should work
+  xsimp []
 
 open Lang
 
