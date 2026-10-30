@@ -197,17 +197,14 @@ macro "xwp" : tactic =>
   `(tactic|
     (try simp_all) <;>
     (first | apply XLemmas.xwp_fun (by rfl) | apply XLemmas.xwp_fix (by rfl)) <;>
-    simp [wpgen, Lang.Term.isubst, wpgen.var] <;>
+    (try simp [wpgen, Lang.Term.isubst, wpgen.var, MSubst.Context.lookup, List.lookup]) <;>
     xdisplay)
 
 open Lang
-elab "xauto_seq_step" : tactic => withMainContext do
+elab "xstep" : tactic => withMainContext do
+  evalTactic <| ← `(tactic| xstruct? <;> xlet_xseq?)
   let some (_, F, _) ← XHelpers.parseTarget? | throwError "parseOp! failed: could not parse target"
   match F with
-  | ~q(wpgen.let $F1 $F2) =>
-    evalTactic <| ← `(tactic| xlet)
-  | ~q(wpgen.seq $F1 $F2) =>
-    evalTactic <| ← `(tactic| xseq)
   | ~q(wpgen.val $v) =>
     evalTactic <| ← `(tactic| xval)
   | ~q(wpgen.app $t) =>
@@ -215,15 +212,15 @@ elab "xauto_seq_step" : tactic => withMainContext do
     match appFn with
     | ~q(Lang.Term.val (Lang.Val.prim $op)) =>
       evalTactic <| ← `(tactic| xapp_op)
-    | _ => throwError "xauto_seq_step: unsupported app {appFn}"
+    | _ => throwError "xstep: unsupported app {appFn}"
   | ~q(wpgen.if $t $F1 $F2) =>
     match t with
     | ~q([slf| true]) => evalTactic <| ← `(tactic| xif_true)
     | ~q([slf| false]) => evalTactic <| ← `(tactic| xif_false)
-    | _ => throwError "xauto_seq_step: unsupported if condition {t}"
-  | _ => throwError "xauto_seq_step: unsupported target {F}"
+    | _ => throwError "xstep: unsupported if condition {t}"
+  | _ => throwError "xstep: unsupported target {F}"
 
-macro "xauto_seq" : tactic => `(tactic| repeat xauto_seq_step)
+macro "xsteps" : tactic => `(tactic| repeat xstep)
 
 namespace XWPNotationExamples
 open Lang XLemmas
@@ -240,18 +237,42 @@ example (p: Loc) (n: Int):
   xapp_op
   xapp_op
 
+example {n v: Int}:
+  let prog: Val := [slf|
+    vfun n =>
+      let v1 := [n + v] in
+      let v2 := 1 in
+      let v3 := v1 + v2 in
+      let v4 := v2 + v3 in
+      let v5 := v4 + [v] in
+      v5 + [v]
+  ]
+  Triple (.app prog n)
+    \[]
+    (fun r => \[r = (n + v + v + v + 2: Int)])
+:= by
+  xwp
+  xstep
+  xstep
+  xstep
+  xstep
+  xstep
+  xstep
+  omega
+
+
 example:
   forall n: Int, Triple (.app succ_using_incr n)
     \[]
     (fun r => \[r = (n + 1: Int)])
 := by
   intro n
-  xwp; xauto_seq
+  xwp; xsteps
   intro x p E; simp_all only []; xdisplay
   xapp (incr_spec _ _)
   -- xlet; xapp_op; xapp_op
   -- xval
-  xauto_seq
+  xsteps
   xsimp
 
 example (n: Nat):
@@ -259,16 +280,22 @@ example (n: Nat):
     \[]
     (fun r => \[r = (Nat.factorial n)])
 := by
+  simp
   induction n
   case zero =>
     simp [Nat.factorial]
-    xwp; xauto_seq
+    xwp
+    xstep
+    xstep
+    xstep
     xsimp
   case succ n IH =>
     xwp
-    xauto_seq
+    xstep
+    xstep
+    xstep
     xapp IH
-    xapp_op
+    xstep
     simp [Nat.factorial]
 
 example {n: Int} {p: Loc}:
@@ -285,7 +312,7 @@ example {n: Int} {p: Loc}:
 := by
   intro is3
   xwp
-  xauto_seq
+  xsteps
   xif
   . -- case true
     intro H
@@ -334,12 +361,12 @@ example (n: Int):
       apply Hf; xsimp
     case succ nx' IH =>
       apply Hf; xsimp; xdisplay
-      xauto_seq
+      xsteps
       cases nx'
       case zero =>
         specialize Hf 0 \[];
         xapp Hf
-        xauto_seq
+        xsteps
       case succ nx' =>
         xapp IH
         xapp_op

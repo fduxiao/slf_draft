@@ -740,7 +740,7 @@ syntax "(" xwp_code ")": xwp_code
 syntax ppDedent("`(" xwp_code ")"): xwp_code
 syntax "<[" xwp_code "]>": term
 syntax "Fail": xwp_code
-syntax "Val " term: xwp_code
+syntax "Val " slf_term: xwp_code
 syntax ppGroup("Let " ident " := " xwp_code " in ") ppDedent(ppLine xwp_code) : xwp_code
 syntax ppGroup("Seq " xwp_code " ; ") ppDedent(ppLine xwp_code) : xwp_code
 syntax "App " slf_term : xwp_code
@@ -757,7 +757,7 @@ macro_rules
   | `(<[ ($F) ]>) => `(<[ $F ]>)
   | `(<[ `($F) ]>) => `(mkStruct <[ $F ]>)
   | `(<[ Fail ]>) => `(wpgen.fail)
-  | `(<[ Val $v ]>) => `(wpgen.val $v)
+  | `(<[ Val $v ]>) => `(wpgen.val [slf| $v])
   | `(<[ Let $x := $F1 in $F2 ]>) => `(wpgen.let <[ $F1 ]> (fun $x => <[ $F2 ]>))
   | `(<[ Seq $F1 ; $F2 ]>) => `(wpgen.seq <[ $F1 ]> <[ $F2 ]>)
   | `(<[ App $t ]>) => `(wpgen.app [slf| $t ])
@@ -785,7 +785,9 @@ def unexpandWpgenFail : Lean.PrettyPrinter.Unexpander
 
 @[app_unexpander wpgen.val]
 def unexpandWpgenVal : Lean.PrettyPrinter.Unexpander
-  | `($_ $v) => `(<[ Val $v ]>)
+  | `($_ $v) => do
+    let v ← parseToSlf v
+    `(<[ Val $v ]>)
   | _ => throw ()
 
 @[app_unexpander wpgen.let]
@@ -846,6 +848,18 @@ def unexpandWpgenFix : Lean.PrettyPrinter.Unexpander
 namespace WPGen.XWPNotationExamples
 open XLemmas
 
+/--
+Defined to be the following
+```
+[slf|
+  vfun p =>
+    let n := !p in
+    let m := n + 1 in
+    p := m
+]
+```
+
+-/
 def incr: Val := [slf|
     vfun p =>
       let n := !p in
@@ -866,6 +880,47 @@ theorem incr_spec (p: Loc) (n: Int):
   apply xstruct; apply xapp (Triple.set)
   xsimp
 
+example {n v: Int}:
+  let prog: Val := [slf|
+    vfun n =>
+      let v1 := [n + v] in
+      let v2 := 1 in
+      let v3 := v1 + v2 in
+      let v4 := v2 + v3 in
+      let v5 := v4 + [v] in
+      v5 + [v]
+  ]
+  Triple (.app prog n)
+    \[]
+    (fun r => \[r = (n + v + v + v + 2: Int)])
+:= by
+  apply xwp_fun rfl; simp [wpgen, Term.isubst]
+  apply xstruct; apply xlet
+  apply xstruct; apply xval
+  apply xstruct; apply xlet
+  apply xstruct; apply xval
+  apply xstruct; apply xlet
+  apply xstruct; apply xapp (Triple.add); xsimp
+  apply xstruct; apply xlet
+  apply xstruct; apply xapp (Triple.add); xsimp
+  apply xstruct; apply xlet
+  apply xstruct; apply xapp (Triple.add); xsimp
+  apply xstruct; apply xapp (Triple.add); xsimp
+  omega
+
+/--
+Defined to be the following
+```
+[slf|
+  vfun n =>
+    let r := ref n in
+    [incr] r;
+    let x := ! r in
+    free r;
+    x
+]
+```
+-/
 def succ_using_incr : Val := [slf|
   vfun n =>
     let r := ref n in
@@ -894,6 +949,20 @@ example:
   apply xstruct; apply xval
   xsimp
 
+/--
+Defined to be the following
+```
+[slf|
+  vfix f n =>
+    let b := n > 0 in
+    if b then
+      let n' := n - 1 in
+      let r := f n' in
+      n * r
+    else 1
+]
+```
+-/
 def factorial: Val := [slf|
   vfix f n =>
     let b := n > 0 in
@@ -905,6 +974,15 @@ def factorial: Val := [slf|
 ]
 
 -- Note this is not `_root_.Nat.factorial` but `Nat.factorial` in the current namespace
+
+/--
+Defined to be the following
+```lean
+def Nat.factorial: Nat → Nat
+  | 0 => 1
+  | n+1 => (n+1) * Nat.factorial n
+```
+-/
 def Nat.factorial: Nat → Nat
   | 0 => 1
   | n+1 => (n+1) * Nat.factorial n

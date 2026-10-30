@@ -234,9 +234,9 @@ section Syntax
 -/
 section Definition
 declare_syntax_cat slf_term (behavior := symbol)
-scoped syntax "[slf| " slf_term " ]" : term
-scoped syntax " [" term "] " : slf_term
-scoped syntax " (" slf_term ") " : slf_term
+scoped syntax "[slf| " ppRealGroup(slf_term) " ]" : term
+scoped syntax "[" term "]" : slf_term
+scoped syntax "(" slf_term ")" : slf_term
 -- variable
 scoped syntax ident : slf_term
 -- number
@@ -245,22 +245,22 @@ scoped syntax num : slf_term
 scoped syntax "true" : slf_term
 scoped syntax "false" : slf_term
 -- application
-scoped syntax:70 slf_term:70 slf_term:71 : slf_term
+scoped syntax:70 slf_term:70 ppSpace slf_term:71 : slf_term
 -- ite
 scoped syntax:31 "if " slf_term:1 " then " slf_term:1 " else " slf_term:1 : slf_term
 scoped syntax:31 "if " slf_term:1 " then " slf_term:1 " end" : slf_term
 -- seq
-scoped syntax:32 slf_term "; " slf_term:1 : slf_term
+scoped syntax:32 slf_term ";" ppDedent(ppSpace slf_term:1) : slf_term
 -- let
-scoped syntax:32 "let " ident " := " slf_term:1 " in " slf_term:1 : slf_term
-scoped syntax:32 "let " ident ident+ " := " slf_term:1 " in " slf_term:1 : slf_term
-scoped syntax:32 "let " " rec " ident ident+ " := " slf_term:1 " in " slf_term:1 : slf_term
+scoped syntax:32 "let " ident " := " slf_term:1 " in" ppDedent(ppSpace slf_term:1) : slf_term
+scoped syntax:32 "let " ident ident+ " := " slf_term:1" in" ppDedent(ppSpace slf_term:1) : slf_term
+scoped syntax:32 "let " " rec " ident ident+ " := " slf_term:1 " in" ppDedent(ppSpace slf_term:1) : slf_term
 -- fun
-scoped syntax:31 "fun " ident+ " => " slf_term:1 : slf_term
-scoped syntax:31 "vfun " ident+ " => " slf_term:1 : slf_term
+scoped syntax:31 "fun " ident+ " =>" ppSpace slf_term:1 : slf_term
+scoped syntax:31 "vfun " ident+ " =>" ppSpace slf_term:1 : slf_term
 -- fix
-scoped syntax:31 "fix " ident ident+ " => " slf_term:1 : slf_term
-scoped syntax:31 "vfix " ident ident+ " => " slf_term:1 : slf_term
+scoped syntax:31 "fix " ident ident+ " =>" ppSpace slf_term:1 : slf_term
+scoped syntax:31 "vfix " ident ident+ " =>" ppSpace slf_term:1 : slf_term
 -- unit
 scoped syntax "unit" : slf_term
 
@@ -842,12 +842,12 @@ def l: Loc := 3
 #guard slf_pp [slf| [x ++ "y"] y z] = "[slf| [x ++ \"y\"] y z ]"
 #guard slf_pp [slf| (x y) z] = "[slf| x y z ]"
 #guard slf_pp [slf| x (y z)] = "[slf| x (y z) ]"
-#guard slf_pp [slf| x (y (z w))] = "[slf| x (y (z w) ) ]"
+#guard slf_pp [slf| x (y (z w))] = "[slf| x (y (z w)) ]"
 #guard slf_pp [slf| x (y z) w] = "[slf| x (y z) w ]"
 #guard slf_pp [slf| x y z w] = "[slf| x y z w ]"
 #guard slf_pp [slf| [x] y z w] = "[slf| [x] y z w ]"
 #guard slf_pp [slf| [x] y [x] w] = "[slf| [x] y [x] w ]"
-#guard slf_pp [slf| [x] (y [x]) w] = "[slf| [x] (y [x] ) w ]"
+#guard slf_pp [slf| [x] (y [x]) w] = "[slf| [x] (y [x]) w ]"
 #guard slf_pp [slf| if x then y else z] = "[slf| if x then y else z ]"
 #guard slf_pp [slf| if x then y end] = "[slf| if x then y end ]"
 #guard slf_pp [slf| if [x] then y; z else w] = "[slf| if [x] then y; z else w ]"
@@ -884,11 +884,11 @@ def prim := Val.prim Prim.get
 #guard slf_pp [slf| not] = "[slf| not ]"
 -- the rest must be application of the primitive to its arguments
 -- get
-#guard slf_pp (Term.app (Val.prim Prim.get) x) = "[slf| ! [x] ]"
+#guard slf_pp (Term.app (Val.prim Prim.get) x) = "[slf| ![x] ]"
 #guard slf_pp [slf| !x] = "[slf| !x ]"
 #guard slf_pp [slf| !!x] = "[slf| !!x ]"
-#guard slf_pp [slf| ! x (x y)] = "[slf| ! (x (x y) ) ]"
-#guard slf_pp [slf| ! x x y] = "[slf| ! (x x y) ]"
+#guard slf_pp [slf| ! x (x y)] = "[slf| !(x (x y)) ]"
+#guard slf_pp [slf| ! x x y] = "[slf| !(x x y) ]"
 -- assign
 #guard slf_pp (Term.app (Term.app (Val.prim Prim.set) x) "y") = "[slf| [x] := y ]"
 -- arithmetic
@@ -910,7 +910,7 @@ def prim := Val.prim Prim.get
 #guard slf_pp [slf| x * (y + z)] = "[slf| x * (y + z) ]"
 #guard slf_pp [slf| x * y + z] = "[slf| x * y + z ]"
 #guard slf_pp [slf| x * (-y) + z] = "[slf| x * (-y) + z ]"
-#guard slf_pp [slf| -x * y + z] = "[slf| - (x * y) + z ]"
+#guard slf_pp [slf| -x * y + z] = "[slf| -(x * y) + z ]"
 #guard slf_pp [slf| (-x) * y + z] = "[slf| (-x) * y + z ]"
 -- pointer arithmetic
 #guard slf_pp [slf| x +> y +> z] = "[slf| x +> y +> z ]"
@@ -925,7 +925,7 @@ def prim := Val.prim Prim.get
 #guard slf_pp [slf| -x + (y != z)] = "[slf| -x + (y != z) ]"
 #guard slf_pp [slf| -x + (y <= z)] = "[slf| -x + (y <= z) ]"
 #guard slf_pp [slf| -x + (y < z)] = "[slf| -x + (y < z) ]"
-#guard slf_pp [slf| -[x] + (y >= z)] = "[slf| - [x] + (y >= z) ]"
+#guard slf_pp [slf| -[x] + (y >= z)] = "[slf| -[x] + (y >= z) ]"
 #guard slf_pp [slf| [num] + (y >= z)] = "[slf| [num] + (y >= z) ]"
 #guard slf_pp [slf| (x := 3) <= (y > z)] = "[slf| (x := 3) <= (y > z) ]"
 #guard slf_pp [slf| x +> 3 == y] = "[slf| x +> 3 == y ]"
