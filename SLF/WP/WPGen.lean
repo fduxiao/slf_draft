@@ -880,7 +880,6 @@ example:
     \[]
     (fun r => \[r = (n + 1: Int)])
 := by
-  intro succ_using_incr
   intro n
   apply xwp_fun rfl; simp [wpgen, Term.isubst, wpgen.var]
   apply xstruct; apply xlet
