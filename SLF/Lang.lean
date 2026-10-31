@@ -163,6 +163,22 @@ theorem Term.beq_neq {t1 t2: Term}: (t1 != t2) = true ↔ t1 ≠ t2 := by
   unfold bne
   grind
 
+@[grind =]
+instance {v1 v2: Val}: Decidable (v1 = v2) := by
+  cases E: v1 == v2
+  . apply isFalse
+    grind
+  . apply isTrue
+    grind
+
+@[grind =]
+instance {t1 t2: Term}: Decidable (t1 = t2) := by
+  cases E: t1 == t2
+  . apply isFalse
+    grind
+  . apply isTrue
+    grind
+
 def Term.ind.{u} {motive: Term → Sort u}
   (val : ∀ v, motive (Term.val v))
   (var : ∀ x, motive (Term.var x))

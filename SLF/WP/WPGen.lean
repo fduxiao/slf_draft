@@ -704,6 +704,24 @@ theorem xtriple {t H} {Q: Val → HProp}:
   xchange N
   apply WP.ramified
 
+example {n: Int} {p: Loc}:
+  let prog: Val := [slf|
+    vfun p =>
+      p := 2;
+      p := 3;
+      !p
+  ]
+  Triple (.app prog p) (p ~~> n) (fun r => p ~~> 3 ** \[r = 3])
+:= by
+  intro prog
+  apply xwp_fun rfl; simp [wpgen, Term.isubst]
+  apply xstruct; apply xseq;
+  apply xstruct; apply xapp (Triple.set); xsimp
+  apply xstruct; apply xseq;
+  apply xstruct; apply xapp (Triple.set); xsimp
+  apply xstruct; apply xapp (Triple.get); xsimp
+  decide
+
 example (p: Loc) (n: Int):
   let add3: Val := [slf|
     vfun p =>
