@@ -171,11 +171,15 @@ elab "xapp_op": tactic => withMainContext do
     | ``Lang.Prim.gt => pure ``Triple.gt
     | _ => throwError "xapp_op: unsupported operation"
   let id := mkIdent thmName
-  let xapp := mkIdent ``XLemmas.xapp
-  evalTactic <| ← `(tactic| apply $xapp $id; any_goals xsimp; xdisplay)
+  let xapp := mkIdent ``XLemmas.xapp_protect
+  evalTactic <| ← `(tactic| apply $xapp $id; any_goals xsimp; all_goals ((try simp [Protect]) <;> xdisplay))
 
 macro "xapp" t:term : tactic => `(tactic|
   (xlet_xseq?; xstruct?; apply XLemmas.xapp; apply $t; (try any_goals xsimp); all_goals xdisplay)
+)
+
+macro "xapp'" t:term : tactic => `(tactic|
+  (xlet_xseq?; xstruct?; apply XLemmas.xapp_protect; apply $t; (try any_goals xsimp); all_goals (try simp [Protect]) <;> xdisplay)
 )
 
 syntax "xfun" (" with " term )? : tactic
@@ -197,7 +201,7 @@ macro "xwp" : tactic =>
   `(tactic|
     (try simp_all) <;>
     (first | apply XLemmas.xwp_fun (by rfl) | apply XLemmas.xwp_fix (by rfl)) <;>
-    (try simp [wpgen, Lang.Term.isubst, wpgen.var, MSubst.Context.lookup, List.lookup]) <;>
+    (try simp [wpgen, Lang.Term.isubst, Lang.Term.subst, wpgen.var, MSubst.Context.lookup, List.lookup]) <;>
     xdisplay)
 
 open Lang
@@ -258,8 +262,43 @@ example {n v: Int}:
   xstep
   xstep
   xstep
+  xsimp
   omega
 
+example (p: Loc) (n: Int):
+  let add3: Val := [slf|
+    vfun p =>
+      let v := !p in
+      let v := v + 1 in
+      p := v;
+
+      let v := !p in
+      let v := v + 1 in
+      p := v;
+
+      let v := !p in
+      let v := v + 1 in
+      p := v;
+
+      !p
+  ]
+  Triple (.app add3 p)
+    (p ~~> n)
+    (fun _ => p ~~> (n + 3: Int))
+:= by
+  intro add3
+  xwp
+  xstep
+  xstep
+  xstep
+  xstep
+  xstep
+  xstep
+  xstep
+  xstep
+  xstep
+  xstep
+  grind
 
 example:
   forall n: Int, Triple (.app succ_using_incr n)
@@ -370,6 +409,7 @@ example (n: Int):
       case succ nx' =>
         xapp IH
         xapp_op
+        xsimp
         omega
 
 end XWPNotationExamples

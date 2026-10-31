@@ -705,6 +705,53 @@ theorem xtriple {t H} {Q: Val → HProp}:
   apply WP.ramified
 
 example (p: Loc) (n: Int):
+  let add3: Val := [slf|
+    vfun p =>
+      let v := !p in
+      let v := v + 1 in
+      p := v;
+
+      let v := !p in
+      let v := v + 1 in
+      p := v;
+
+      let v := !p in
+      let v := v + 1 in
+      p := v;
+
+      !p
+  ]
+  Triple (.app add3 p)
+    (p ~~> n)
+    (fun _ => p ~~> (n + 3: Int))
+:= by
+  apply xwp_fun rfl; simp [wpgen, Term.isubst]
+  apply xstruct; apply xlet
+  apply xstruct; apply xapp (Triple.get); xsimp
+  apply xstruct; apply xlet
+  apply xstruct; apply xapp (Triple.add); xsimp
+  apply xstruct; apply xseq
+  apply xstruct; apply xapp (Triple.set); xsimp
+
+  apply xstruct; apply xlet
+  apply xstruct; apply xapp (Triple.get); xsimp
+  apply xstruct; apply xlet
+  apply xstruct; apply xapp (Triple.add); xsimp
+  apply xstruct; apply xseq
+  apply xstruct; apply xapp (Triple.set); xsimp
+
+  apply xstruct; apply xlet
+  apply xstruct; apply xapp (Triple.get); xsimp
+  apply xstruct; apply xlet
+  apply xstruct; apply xapp (Triple.add); xsimp
+  apply xstruct; apply xseq
+  apply xstruct; apply xapp (Triple.set); xsimp
+
+  apply xstruct; apply xapp_protect (Triple.get); xsimp; simp [Protect]
+  grind
+
+
+example (p: Loc) (n: Int):
   let incr: Val := [slf|
     vfun p =>
       let n := !p in
@@ -715,18 +762,13 @@ example (p: Loc) (n: Int):
     (p ~~> n)
     (fun _ => p ~~> (n + 1: Int))
 := by
-  apply xwp_fun rfl
-  apply xstruct
-  apply xlet
-  apply xstruct
-  apply xapp (Triple.get); xsimp
-  apply xstruct
-  apply xlet
-  apply xstruct
-  apply xapp (Triple.add); xsimp
-  apply xstruct
-  apply xapp (Triple.set)
-  xsimp
+  apply xwp_fun rfl; simp [wpgen, Term.isubst]
+  apply xstruct; apply xlet
+  -- apply xstruct; apply xapp (Triple.get); xsimp
+  apply xstruct; apply xapp_protect (Triple.get); xsimp; simp [Protect]
+  apply xstruct; apply xlet
+  apply xstruct; apply xapp_protect (Triple.add); xsimp; simp [Protect]
+  apply xstruct; apply xapp_protect (Triple.set); xsimp; simp [Protect]
 
 end XLemmas
 
