@@ -211,6 +211,36 @@ def Term.ind.{u} {motive: Term → Sort u}
       (Term.ind val var «fun» fix app seq «let» «if» t2)
       (Term.ind val var «fun» fix app seq «let» «if» t3)
 
+@[grind]
+def Term.funs (xs: List Var) (t: Term): Term :=
+  match xs with
+  | [] => t
+  | x::xs => Term.fun x (Term.funs xs t)
+
+@[grind]
+def Val.funs (xs: List Var) (t: Term): Val :=
+  match xs with
+  | [] => default
+  | x::xs' => Val.fun x (Term.funs xs' t)
+
+@[grind]
+def Term.fixs (f: Var) (xs: List Var) (t: Term): Term :=
+  match xs with
+  | [] => t
+  | x::xs' => Term.fix f x (Term.funs xs' t)
+
+@[grind]
+def Val.fixs (f: Var) (xs: List Var) (t: Term): Val :=
+  match xs with
+  | [] => default
+  | x::xs' => Val.fix f x (Term.funs xs' t)
+
+@[grind]
+def Term.apps (t: Term) (ts: List Term): Term :=
+  match ts with
+  | [] => t
+  | t'::ts' => Term.apps (.app t t') ts'
+
 section Instances
 instance: Coe Prim Val where
   coe := Val.prim

@@ -690,6 +690,184 @@ theorem xwp_fix {v1 v2 f x t H Q}:
   apply WP.app_fix
   exact M1
 
+section MultiApp
+
+@[grind]
+def termsToVals: List Term → Option (List Val)
+  | [] => some []
+  | (.val v)::ts =>
+    match termsToVals ts with
+    | some vs => some (v::vs)
+    | none => none
+  | _ => none
+
+theorem termsToVals_eq {ts vs}:
+  termsToVals ts = some vs → ts = List.map .val vs
+:= by
+  intro H
+  induction ts generalizing vs
+  case nil =>
+    simp [termsToVals] at H
+    grind
+  case cons t ts IH =>
+    unfold termsToVals at H
+    grind
+
+@[grind]
+def varFuns: List Var → Nat → Bool
+  | l, n => l.length = n ∧ n > 0 ∧ l.Nodup
+
+theorem Term.subst_funs {xs x v t1}:
+  ¬ x ∈ xs →
+  Term.subst x v (Term.funs xs t1) = Term.funs xs (Term.subst x v t1)
+:= by
+  intro N
+  induction xs
+  case nil =>
+    simp_all [Term.funs]
+  case cons x' xs IH =>
+    specialize IH (by grind)
+    simp_all [Term.funs, Term.subst]
+    intro
+    exfalso
+    apply N.left
+    simp_all
+
+theorem Term.eval_like_funs {xs t1}:
+  xs ≠ [] ->
+  Term.eval_like (Val.funs xs t1) (Term.funs xs t1)
+:= by
+  intro N h Q E
+  cases xs
+  case nil =>
+    contradiction
+  case cons x xs =>
+    simp [Term.funs]
+    simp [Val.funs] at E
+    apply Eval.fun
+    cases E
+    assumption
+
+theorem Term.eval_like_apps_funs {xs t0 vs t1}:
+  Term.eval_like (Val.funs xs t1) t0 ->
+  varFuns xs (List.length vs) ->
+  Term.eval_like (Term.isubst (List.zip xs vs) t1) (Term.apps t0 (List.map .val vs))
+:= by
+  intro M F
+  induction xs generalizing vs t0 t1
+  case nil =>
+    simp [varFuns] at F
+    omega
+  case cons x xs IH =>
+    simp [varFuns] at F
+    rcases vs with _ | ⟨v, vs⟩
+    . exfalso
+      grind
+    rcases vs with _ | ⟨v', vs⟩
+    . simp_all [Term.apps, Val.funs, Term.funs]
+      intro h Q E
+      apply Eval.app1'
+      . apply M
+        apply Eval.val_minimal
+      . simp [PurePost]
+        apply Eval.app_fun rfl
+        exact E
+    simp_all [Term.apps]
+    simp [Term.isubst_cons]
+    apply IH
+    . intro h Q E
+      apply Eval.app1'
+      . apply M
+        apply Eval.val_minimal
+      . simp [PurePost]
+        simp [Val.funs]
+        apply Eval.app_fun rfl
+        simp_all [Term.subst_funs]
+        apply Term.eval_like_funs
+        . grind
+        . exact E
+    . simp [varFuns]
+      simp_all
+
+theorem xwp_funs {t v0 ts vs xs t1 H Q}:
+  t = Term.apps (.val v0) ts →
+  v0 = Val.funs xs t1 →
+  termsToVals ts = some vs →
+  varFuns xs vs.length →
+  H ==> wpgen (List.zip xs vs) t1 Q →
+  Triple t H Q
+:= by
+  intro _ E M1 F M2
+  subst t v0
+  replace M1 := termsToVals_eq M1
+  subst ts
+  apply WP.equiv.mp
+  xchange M2
+  xchange wpgen.sound
+  apply WP.eval_like
+  apply Term.eval_like_apps_funs
+  . rfl
+  . exact F
+
+theorem Term.eval_like_apps_fixs {f xs vs t1 v0}:
+  v0 = Val.fixs f xs t1 →
+  varFuns xs (vs.length) →
+  ¬ f ∈ xs →
+  xs ≠ [] →
+  Term.eval_like (Term.isubst (List.zip (f::xs) (v0::vs)) t1) (Term.apps v0 (List.map .val vs))
+:= by
+  simp [varFuns]
+  intro E F1 F2 F3 N1 N2
+  simp [Term.isubst_cons]
+  rcases vs with _ | ⟨v, vs⟩
+  . exfalso; grind
+  rcases xs with _ | ⟨x, xs⟩
+  . exfalso; grind
+  simp [Term.isubst_cons, Term.apps]
+  rcases xs with _ | ⟨x', xs⟩
+  . rcases vs with _ | ⟨v', vs⟩
+    . simp [Term.apps]
+      simp [Val.fixs, Term.funs] at E
+      intro h Q M
+      apply Eval.app_fix E
+      exact M
+    . exfalso; grind
+  apply eval_like_apps_funs
+  . intro h Q M
+    apply Eval.app_fix E
+    simp_all [Term.subst_funs]
+    apply Term.eval_like_funs
+    . simp
+    . exact M
+  . simp [varFuns]
+    grind
+
+theorem xwp_fixs {t v0 ts vs f xs t1 H Q}:
+  t = Term.apps (.val v0) ts →
+  v0 = Val.fixs f xs t1 →
+  termsToVals ts = some vs →
+  varFuns xs vs.length →
+  ¬ f ∈ xs →
+  H ==> (wpgen (List.zip (f::xs) (v0::vs)) t1) Q →
+  Triple t H Q
+:= by
+  intro _ E M1 F N M2
+  subst t v0
+  replace M1 := termsToVals_eq M1
+  subst ts
+  apply WP.equiv.mp
+  xchange M2
+  xchange wpgen.sound
+  apply WP.eval_like
+  apply Term.eval_like_apps_fixs
+  . rfl
+  . exact F
+  . exact N
+  . simp [varFuns] at F
+    grind
+
+end MultiApp
+
 theorem xtriple {t H} {Q: Val → HProp}:
   H ==> mkStruct (wpgen.app t) Q →
   Triple t H Q
@@ -927,7 +1105,7 @@ def incr: Val := [slf|
       p := m
   ]
 
-theorem incr_spec (p: Loc) (n: Int):
+theorem incr_spec {p: Loc} {n: Int}:
   Triple (.app incr p)
     (p ~~> n)
     (fun _ => p ~~> (n + 1: Int))
@@ -939,6 +1117,20 @@ theorem incr_spec (p: Loc) (n: Int):
   apply xstruct; apply xapp (Triple.add); xsimp
   apply xstruct; apply xapp (Triple.set)
   xsimp
+
+def incr_two: Val := [slf|
+  vfun p q =>
+    [incr] p; [incr] q
+  ]
+
+example (p q: Loc) (n m: Int):
+  Triple [slf| [incr_two] [p] [q] ]
+    (p ~~> n ** q ~~> m) (fun _ => p ~~> ↑(n + 1) ** q ~~> ↑(m + 1))
+:=by
+  apply XLemmas.xwp_funs (xs := ["p", "q"]) (ts := [p, q]) (rfl) rfl rfl rfl; simp [wpgen, Term.isubst]
+  apply xstruct; apply xseq
+  apply xstruct; apply xapp incr_spec; xsimp
+  apply xstruct; apply xapp incr_spec; xsimp
 
 example {n v: Int}:
   let prog: Val := [slf|
@@ -1001,7 +1193,7 @@ example:
   apply xstruct; apply xapp (Triple.ref); xsimp
   intro x p E; simp_all only []
   apply xstruct; apply xseq
-  apply xstruct; apply xapp; (apply incr_spec _ _); (try any_goals xsimp)
+  apply xstruct; apply xapp; apply incr_spec; (try any_goals xsimp)
   apply xstruct; apply xlet
   apply xstruct; apply xapp (Triple.get); xsimp
   apply xstruct; apply xseq
@@ -1072,6 +1264,55 @@ example (n: Nat):
     apply xstruct; apply xapp (Triple.mul); xsimp
     simp [Nat.factorial]
 
+/--
+tail recursion version of factorial
+-/
+def factorial_acc: Val := [slf|
+  vfix f n acc =>
+    let b := n > 0 in
+    if b then
+      let n' := n - 1 in
+      let acc' := acc * n in
+      let r := f n' acc' in
+      r
+    else acc
+]
+
+def Nat.factorial_acc: Nat → Nat → Nat
+  | 0, acc => acc
+  | n+1, acc => Nat.factorial_acc n (acc * (n+1))
+
+example (n acc: Nat):
+  Triple [slf| [factorial_acc] [n] [acc] ]
+    \[]
+    (fun r => \[r = (Nat.factorial_acc n acc)])
+:= by
+  induction n generalizing acc
+  case zero =>
+    simp [Nat.factorial_acc]
+    apply xwp_fixs (xs := [_, _]) (ts := [0, acc]) rfl rfl rfl rfl (by simp)
+    simp [wpgen, Term.isubst, wpgen.var]
+    apply xstruct; apply xlet
+    apply xstruct; apply xapp (Triple.gt); xsimp
+    apply xstruct; apply xif_false
+    apply xstruct; apply xval
+    xsimp
+  case succ n IH =>
+    simp [Nat.factorial_acc]
+    apply xwp_fixs (xs := [_, _]) (ts := [↑(n + 1), acc]) rfl rfl rfl rfl (by simp)
+    simp [wpgen, Term.isubst, wpgen.var]
+    apply xstruct; apply xlet
+    apply xstruct; apply xapp (Triple.gt); xsimp
+    apply xstruct; apply xif_true
+    apply xstruct; apply xlet
+    apply xstruct; apply xapp (Triple.sub); xsimp
+    apply xstruct; apply xlet
+    apply xstruct; apply xapp (Triple.mul); xsimp
+    apply xstruct; apply xlet
+    apply xstruct; apply xapp (IH _); xsimp
+    apply xstruct; apply xval
+    xsimp
+
 -- if
 example {n: Int} {p: Loc}:
   let is3: Val := [slf|
@@ -1133,7 +1374,7 @@ example:
   intro m
   apply H
   apply xstruct; apply xseq
-  apply xstruct; apply xapp (incr_spec _ _); (try any_goals xsimp)
+  apply xstruct; apply xapp (incr_spec); (try any_goals xsimp)
   apply xstruct; apply xapp (Triple.get); xsimp
 
 -- fix

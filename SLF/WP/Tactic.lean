@@ -197,11 +197,71 @@ macro_rules
   | `(tactic| xfix with $t) => `(tactic|
     xstruct?; xlet_xseq?; apply XLemmas.xfix_spec (S := $t); (try any_goals xsimp); all_goals xdisplay)
 
+def XHelpers.getTripleTerm (goal: Q(Prop)) : MetaM Q(Lang.Term) := do
+  match goal with
+  | ~q(Triple $t $pre $post) => pure t
+  | _ => throwError "getTripleTerm: goal {goal} is not a Triple"
+
+partial def XHelpers.splitApp (t: Q(Lang.Term)) : MetaM (Q(Lang.Term) × List Q(Lang.Term)) := do
+  match t with
+  | ~q(Lang.Term.app $f $x) =>
+    let (f', args) ← XHelpers.splitApp f
+    pure (f', args ++ [x])
+  | _ => pure (t, [])
+
+def XHelpers.mkVarList (n: Nat): MetaM (TSyntax `term) := do
+  match n with
+  | 0 => `([])
+  | n + 1 =>
+    let rest ← XHelpers.mkVarList n
+    `(_ :: $rest)
+
+def XHelpers.mkTermList (args: List Q(Lang.Term)) : TermElabM (TSyntax `term) := do
+  match args with
+  | [] => `([])
+  | x :: xs => do
+    let rest' ← XHelpers.mkTermList xs
+    let x ← Term.exprToSyntax x
+    `($x :: $rest')
+
+elab "xwp_funs?": tactic => withMainContext do
+  let goal ← getMainGoalQ
+  let t ← XHelpers.getTripleTerm goal
+  let (_f, args) ← XHelpers.splitApp t
+  let vars ← XHelpers.mkVarList args.length
+  logInfo m!"apply XLemmas.xwp_funs (xs := {vars}) (ts := {args}) rfl rfl rfl rfl"
+
+elab "xwp_funs": tactic => withMainContext do
+  let goal ← getMainGoalQ
+  let t ← XHelpers.getTripleTerm goal
+  let (_f, args) ← XHelpers.splitApp t
+  let vars ← XHelpers.mkVarList args.length
+  let ts ← XHelpers.mkTermList args
+  evalTactic <| ← `(tactic| apply XLemmas.xwp_funs (xs := $vars) (ts := $ts) rfl rfl rfl rfl)
+
+elab "xwp_fixs?": tactic => withMainContext do
+  let goal ← getMainGoalQ
+  let t ← XHelpers.getTripleTerm goal
+  let (_f, args) ← XHelpers.splitApp t
+  let vars ← XHelpers.mkVarList args.length
+  logInfo m!"refine XLemmas.xwp_fixs (xs := {vars}) (ts := {args}) rfl rfl rfl rfl (by simp) ?_"
+
+elab "xwp_fixs": tactic => withMainContext do
+  let goal ← getMainGoalQ
+  let t ← XHelpers.getTripleTerm goal
+  let (_f, args) ← XHelpers.splitApp t
+  let vars ← XHelpers.mkVarList args.length
+  let ts ← XHelpers.mkTermList args
+  evalTactic <| ← `(tactic| refine XLemmas.xwp_fixs (xs := $vars) (ts := $ts) rfl rfl rfl rfl (by simp) ?_)
+
 macro "xwp" : tactic =>
   `(tactic|
     (try simp_all) <;>
-    (first | apply XLemmas.xwp_fun (by rfl) | apply XLemmas.xwp_fix (by rfl)) <;>
-    (try simp [wpgen, Lang.Term.isubst, Lang.Term.subst, wpgen.var, MSubst.Context.lookup, List.lookup]) <;>
+    (first | xwp_funs | xwp_fixs) <;>
+    (try simp [
+        wpgen, Lang.Term.isubst, Lang.Term.subst,
+        wpgen.var, MSubst.Context.lookup, List.lookup
+      ]) <;>
     xdisplay)
 
 open Lang
@@ -240,6 +300,14 @@ example (p: Loc) (n: Int):
   xlet
   xapp_op
   xapp_op
+
+example (p q: Loc) (n m: Int):
+  Triple [slf| [incr_two] [p] [q] ]
+    (p ~~> n ** q ~~> m) (fun _ => p ~~> ↑(n + 1) ** q ~~> ↑(m + 1))
+:= by
+  xwp
+  xapp incr_spec
+  xapp incr_spec
 
 example {n v: Int}:
   let prog: Val := [slf|
@@ -308,7 +376,7 @@ example:
   intro n
   xwp; xsteps
   intro x p E; simp_all only []; xdisplay
-  xapp (incr_spec _ _)
+  xapp incr_spec
   -- xlet; xapp_op; xapp_op
   -- xval
   xsteps
@@ -336,6 +404,30 @@ example (n: Nat):
     xapp IH
     xstep
     simp [Nat.factorial]
+
+example (n acc: Nat):
+  Triple [slf| [factorial_acc] [n] [acc] ]
+    \[]
+    (fun r => \[r = (Nat.factorial_acc n acc)])
+:= by
+  induction n generalizing acc
+  case zero =>
+    simp [Nat.factorial_acc]
+    xwp
+    xstep
+    xstep
+    xstep
+    xsimp
+  case succ n IH =>
+    simp [Nat.factorial_acc]
+    xwp
+    xstep
+    xstep
+    xstep
+    xstep
+    xapp (IH _)
+    xstep
+    xsimp
 
 example {n: Int} {p: Loc}:
   let is3: Val := [slf|
@@ -376,7 +468,7 @@ example:
   simp [CounterSpec]
   intro m
   apply H
-  xapp (incr_spec _ _)
+  xapp incr_spec
   xapp_op
 
 -- fix

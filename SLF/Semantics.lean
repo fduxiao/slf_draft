@@ -555,6 +555,12 @@ inductive Eval : Heap → Term → (Val → Heap → Prop) → Prop where
       Q .unit (s ÷ p) →
       Eval s [slf| free [p] ] Q
 
+/--
+This states that the evaluation of a value only depends on the current heap and the value itself,
+and does not modify the heap.
+> Note that `PurePost s P := fun v s' => P v ∧ s = s'`.
+> Thus, `(PurePost s (· = v)) := fun v s' => v = v ∧ s = s' := fun _ s' => s = s'`
+-/
 @[grind .]
 theorem Eval.val_minimal {s v}:
   Eval s (.val v) (PurePost s (· = v))

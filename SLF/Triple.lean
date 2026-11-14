@@ -6,6 +6,9 @@ open Map Lang Heap
 
 section Triple
 
+/--
+`Triple t H Q := ∀ s, H s → Eval s t Q`
+-/
 @[grind]
 def Triple (t: Term) (H: HProp) (Q: Val → HProp) : Prop :=
   ∀ s, H s → Eval s t Q
@@ -22,10 +25,16 @@ inductive Terminates : Heap → Term → Prop where
       (∀ {s' t'}, Step s t s' t' → Terminates s' t') →
       Terminates s t
 
+/--
+`Safe s t := ∀ s' t', MStep s t s' t' → NonStuck s' t'`
+-/
 @[grind]
 def Safe (s: Heap) (t: Term) : Prop :=
   ∀ s' t', MStep s t s' t' → NonStuck s' t'
 
+/--
+`Correct s t Q := ∀ s' v, MStep s t s' v → Q v s'`
+-/
 @[grind]
 def Correct (s: Heap) (t: Term) (Q: Val → HProp) : Prop :=
   ∀ s' (v: Val), MStep s t s' v → Q v s'
@@ -262,6 +271,14 @@ theorem Triple.sound {t H Q}:
   . exact M.terminates
   . exact M.safe
   . exact M.correct
+
+theorem Triple.correct {t H Q}:
+  Triple t H Q →
+  ∀ s, H s → ∀ s' (v: Val), MStep s t s' v → Q v s'
+:= by
+  intro M  s Hs
+  replace M := M.sound s Hs
+  apply M.right.right
 
 end Soundness
 

@@ -316,7 +316,11 @@ scoped elab_rules : tactic
       if ty.isForall then
         `(tactic| xchange_rewrite $ltr ($M _))
       else
-        throwError m!"xchange_rewrite does not type {ty}"
+        let ty ← whnf ty
+        if ty.isForall then
+          `(tactic| xchange_rewrite $ltr ($M _))
+        else
+          throwError m!"xchange_rewrite does not type {ty}"
 
 #try {H1 H3 H4} (J J':Int → HProp):
   (forall n, J n ** H1 = J' (n + 1)) →
