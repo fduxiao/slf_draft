@@ -372,6 +372,9 @@ scoped macro "xsimp_core" cancel_wand:(bool)?: tactic => do
     (tactic_mark <;> xsimp_start <;> (repeat' xsimp_step $[$cancel_wand:bool]?) <;> xsimp_post; clear_mark')
   )
 
+/--
+`xsimp'` does not try a final `simp`.
+-/
 scoped syntax "xsimp' " ("(" "cancel_wands" " := " bool ")")? ("[" term,* "]")?: tactic
 scoped macro_rules
   | `(tactic| xsimp' $[ ( cancel_wands := $b) ]? [ ]) =>
@@ -603,6 +606,7 @@ example {H}:
   intro n
   guard_target = p ~~> [slf| [n] ] ==> \∃ m, p ~~> [slf| [(m + 1: Int)] ]
   xsimp' [n-1]
+  congr
   guard_target = n = n - 1 + 1
   lia
 

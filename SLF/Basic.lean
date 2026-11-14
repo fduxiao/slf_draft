@@ -85,3 +85,59 @@ theorem incr_two_triple : ∀ (p q: Loc) (n m: Int),
   xwp
   xapp incr_triple
   xapp incr_triple
+  xsimp
+
+def aliased_call : Val := [slf|
+  vfun p =>
+    [incr_two] p p
+]
+
+theorem triple_incr_two_aliased : ∀ (p: Loc) (n: Int),
+  Triple [slf| [incr_two] [p] [p]]
+    (p ~~> n)
+    (fun _ => p ~~> ↑(n + 2))
+:= by
+  intro p n
+  xwp
+  xapp incr_triple
+  xapp incr_triple
+  xsimp
+  lia
+
+theorem triple_aliased_call : ∀ (p: Loc) (n: Int),
+  Triple (.app aliased_call p)
+    (p ~~> n)
+    (fun _ => p ~~> ↑(n + 2))
+:= by
+  intro p n
+  xwp
+  xapp triple_incr_two_aliased
+
+def incr_first : Val := [slf|
+  vfun p q =>
+    [incr] p
+]
+
+example (p q: Loc) (n m: Int):
+  Triple [slf| [incr_first] [p] [q] ]
+    (p ~~> n ** q ~~> m)
+    (fun _ => p ~~> ↑(n + 1) ** q ~~> m)
+:= by
+  xwp
+  xapp incr_triple
+
+theorem triple_incr_first (p q: Loc) (n: Int):
+  Triple [slf| [incr_first] [p] [q] ]
+    (p ~~> n)
+    (fun _ => p ~~> ↑(n + 1))
+:= by
+  xwp
+  xapp incr_triple
+
+example (p q: Loc) (n m: Int):
+  Triple [slf| [incr_first] [p] [q] ]
+    (p ~~> n ** q ~~> m)
+    (fun _ => p ~~> ↑(n + 1) ** q ~~> m)
+:= by
+  xwp'
+  xapp triple_incr_first

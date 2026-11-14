@@ -174,11 +174,11 @@ elab "xapp_op": tactic => withMainContext do
   let xapp := mkIdent ``XLemmas.xapp_protect
   evalTactic <| ← `(tactic| apply $xapp $id; any_goals xsimp; all_goals ((try simp [Protect]) <;> xdisplay))
 
-macro "xapp" t:term : tactic => `(tactic|
+macro "xapp'" t:term : tactic => `(tactic|
   (xlet_xseq?; xstruct?; apply XLemmas.xapp; apply $t; (try any_goals xsimp); all_goals xdisplay)
 )
 
-macro "xapp'" t:term : tactic => `(tactic|
+macro "xapp" t:term : tactic => `(tactic|
   (xlet_xseq?; xstruct?; apply XLemmas.xapp_protect; apply $t; (try any_goals xsimp); all_goals (try simp [Protect]) <;> xdisplay)
 )
 
@@ -254,15 +254,34 @@ elab "xwp_fixs": tactic => withMainContext do
   let ts ← XHelpers.mkTermList args
   evalTactic <| ← `(tactic| refine XLemmas.xwp_fixs (xs := $vars) (ts := $ts) rfl rfl rfl rfl (by simp) ?_)
 
+/--
+`xwp` applies the weakest precondition tactic to the current goal,
+handling both function and fixed-point applications.
+-/
 macro "xwp" : tactic =>
   `(tactic|
     (try simp_all) <;>
-    (first | xwp_funs | xwp_fixs) <;>
+    (first | xwp_funs | xwp_fixs | apply Triple.of_wpgen) <;>
     (try simp [
         wpgen, Lang.Term.isubst, Lang.Term.subst,
         wpgen.var, MSubst.Context.lookup, List.lookup
       ]) <;>
     xdisplay)
+
+/--
+`xwp'` applies the weakest precondition tactic to the current goal,
+but does not handle function or fixed-point applications.
+-/
+macro "xwp'" : tactic =>
+  `(tactic|
+    (try simp_all) <;>
+    apply Triple.of_wpgen <;>
+    (try simp [
+        wpgen, Lang.Term.isubst, Lang.Term.subst,
+        wpgen.var, MSubst.Context.lookup, List.lookup
+      ]) <;>
+    xdisplay
+  )
 
 open Lang
 elab "xstep" : tactic => withMainContext do
@@ -308,6 +327,7 @@ example (p q: Loc) (n m: Int):
   xwp
   xapp incr_spec
   xapp incr_spec
+  xsimp
 
 example {n v: Int}:
   let prog: Val := [slf|

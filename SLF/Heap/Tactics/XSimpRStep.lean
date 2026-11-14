@@ -254,6 +254,14 @@ example (p: Loc) (n: Int):
   guard_target = XSimp (\[], \[], \[]) (\[], \[], \[])
   simp [XSimp]
 
+open Lang in
+example (p: Loc) (n: Int):
+  XSimp (p ~~> ↑(n + 1 + 1) ** \[], \[], \[]) (\[], \[], p ~~> ↑(n + 2) ** \[])
+:= by
+  xsimp_step_r
+  guard_target = XSimp (p ~~> ↑(n + 1 + 1) ** \[], \[], \[]) (p ~~> ↑(n + 2) ** \[], \[], \[])
+  grind
+
 example {H1 H2 H3}:
   H1 ** \GC ** H2 ** H3 ==> H1 ** \GC ** H2 ** H3
 := by
@@ -362,7 +370,9 @@ We implement the `xsimp_hook` tactic to handle custom simplification steps durin
 -/
 open Lean Meta Elab Tactic Qq Lang XHelpers
 
-scoped macro "xsimp_cancel_by_eq": tactic => `(tactic| first | (congr <;> try rfl) | try rfl)
+scoped macro "xsimp_cancel_by_eq": tactic => `(tactic|
+  first | (apply congrArg <;> (try rfl)) | try rfl
+)
 scoped elab "xsimp_hook_single" _t:term: tactic => withMainContext do
   let goal ← getMainGoalQ
   let Hla ← parseXSimpHla goal
@@ -387,11 +397,23 @@ scoped elab "xsimp_hook_single" _t:term: tactic => withMainContext do
 scoped macro_rules
   | `(tactic| xsimp_hook $t) => `(tactic| xsimp_hook_single $t)
 
+open Lang in
+example (p: Loc) (n: Int):
+  XSimp (p ~~> ↑(n + 1 + 1) ** \[], \[], \[]) (\[], \[], p ~~> ↑(n + 2) ** \[])
+:= by
+  xsimp_step_r
+  . simp
+    guard_target = n + 1 + 1 = n + 2
+    omega
+  . guard_target = XSimp (\[], \[], \[]) (\[], \[], \[])
+    simp [XSimp]
+
 example {p} {n: Int}:
   XSimp (p ~~> n ** \[], \[], \[]) (\[], \[], p ~~> (n - 1 + 1: Int) ** \[])
 := by
   xsimp_step_r
-  . guard_target = n = n - 1 + 1
+  . congr
+    guard_target = n = n - 1 + 1
     lia
   . guard_target = XSimp (\[], \[], \[]) (\[], \[], \[])
     simp [XSimp]
