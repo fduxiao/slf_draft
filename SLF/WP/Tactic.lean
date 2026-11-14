@@ -44,6 +44,7 @@ def unexpandXWPDisp : Lean.PrettyPrinter.Unexpander
   | _ => throw ()
 
 macro "xdisplay" : tactic => `(tactic| try rw [XWPDisp.start])
+macro "xdisplay_end" : tactic => `(tactic| try rw [←XWPDisp.start])
 
 open XLemmas in
 example (p: Loc) (n: Int):
@@ -174,6 +175,14 @@ elab "xapp_op": tactic => withMainContext do
   let xapp := mkIdent ``XLemmas.xapp_protect
   evalTactic <| ← `(tactic| apply $xapp $id; any_goals xsimp; all_goals ((try simp [Protect]) <;> xdisplay))
 
+/--
+`xref` tactic applies the `xapp_op` tactic, introduces the necessary variables,
+and performs substitution.
+-/
+macro "xref" t:term : tactic => `(tactic|
+  xapp_op <;> intro x $t E <;> subst x
+)
+
 macro "xapp'" t:term : tactic => `(tactic|
   (xlet_xseq?; xstruct?; apply XLemmas.xapp; apply $t; (try any_goals xsimp); all_goals xdisplay)
 )
@@ -293,6 +302,7 @@ elab "xstep" : tactic => withMainContext do
   | ~q(wpgen.app $t) =>
     let appFn ← XHelpers.getTermAppFn t
     match appFn with
+    | ~q(Lang.Term.val (Lang.Val.prim .ref)) => throwError "xstep: unsupported app {appFn}"
     | ~q(Lang.Term.val (Lang.Val.prim $op)) =>
       evalTactic <| ← `(tactic| xapp_op)
     | _ => throwError "xstep: unsupported app {appFn}"
@@ -395,7 +405,7 @@ example:
 := by
   intro n
   xwp; xsteps
-  intro x p E; simp_all only []; xdisplay
+  xref p
   xapp incr_spec
   -- xlet; xapp_op; xapp_op
   -- xval

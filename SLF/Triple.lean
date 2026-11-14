@@ -13,7 +13,7 @@ section Triple
 def Triple (t: Term) (H: HProp) (Q: Val → HProp) : Prop :=
   ∀ s, H s → Eval s t Q
 
-notation "funloc" p "=>" H => (fun (r: Val) => \∃ p, \[r = Val.loc p] ** H)
+-- notation "funloc " p " => " H => (fun (r: Val) => \∃ p, \[r = Val.loc p] ** H)
 
 end Triple
 

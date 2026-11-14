@@ -371,6 +371,27 @@ notation:60 Q:60 " *+ " H:61 => HProp.qstar Q H
 notation:57 H1:57 " -* " H2:57 => HProp.wand H1 H2
 notation:57 Q1:57 " -** " Q2:58 => HProp.qwand Q1 Q2
 
+section FunLoc
+open Lean PrettyPrinter
+@[reducible]
+def HProp.funloc (f: Loc → HProp): Val → HProp := fun r => \∃ p: Loc, \[r == Val.loc p] ** f p
+
+scoped syntax "funloc " ident+ " => " term: term
+macro_rules
+  | `(funloc $p:ident => $H) => `(HProp.funloc (fun $p:ident => $H))
+  | `(funloc $p:ident $[$ps:ident]* => $H) => `(HProp.funloc (fun $p:ident => \∃ $[$ps:ident]*, $H))
+
+@[app_unexpander HProp.funloc]
+def HProp.funloc.unexpander : Lean.PrettyPrinter.Unexpander
+  | `($_ fun $x:ident => $H) =>
+    match H with
+    | `(\∃ $[$y:ident]*, $H') => `(funloc $x:ident $[$y:ident]* => $H')
+    | `(funloc $[$y:ident]* => $H') => `(funloc $x:ident $[$y:ident]* => $H')
+    | _ => `(funloc $x:ident => $H)
+  | _ => throw ()
+
+end FunLoc
+
 end HPropOp
 
 section HPropProperties
