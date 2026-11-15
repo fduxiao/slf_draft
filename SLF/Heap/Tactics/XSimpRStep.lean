@@ -203,18 +203,11 @@ scoped elab "xsimp_step_r_core": tactic => withMainContext do
           let stx ← Term.exprToSyntax H
           `(tactic | first | xsimp_hook $stx | apply XSimp.right_keep)
     | ~q(HProp.exists $P) =>
-      let boundVar: TSyntax `term ←
-        if P.isLambda then
-            let x := P.bindingName!
-            let i := Lean.mkIdent x
-            `(term| ?$i)
-        else
-          `(?_)
       let hintValue ← popXSimpHintSkipHole?
       match hintValue with
       | none =>
         if P.isLambda then
-          `(tactic| first | apply XSimp.right_exists (x := $boundVar) | apply XSimp.right_exists (x := ?_))
+          `(tactic| first | apply XSimp.right_exists (x := ?_))
         else
           `(tactic| first | apply XSimp.right_exists)
       | some v =>
@@ -342,7 +335,7 @@ open Lang in
   guard_target =
     XSimp
       ((Q' -** Q1) ** (Q1 -** Q2) ** F Q' ** \[], \[], \[])
-      (\[], \[], (F ?Q') ** (?Q' -** Q2) ** \[])
+      (\[], \[], (F _) ** (_ -** Q2) ** \[])
   xsimp_step_r
   all_goals sorry
 
@@ -360,7 +353,7 @@ open Lang in
   xsimp_step_r
   xsimp_step_r
   . guard_target =
-      XSimp (p ~~> 3 ** \[], \[], \[]) (p ~~> (?n + 1: Int) ** \[], \[], \[])
+      XSimp (p ~~> 3 ** \[], \[], \[]) (p ~~> (_ + 1: Int) ** \[], \[], \[])
     sorry
   . guard_target = Int
     sorry
@@ -424,7 +417,7 @@ example {p}:
   xsimp_start
   repeat xsimp_step_l
   xsimp_step_r
-  guard_target = XSimp (p ~~> 3 ** \[], \[], \[]) (\[], \[], p ~~> [slf| [?n] ] ** \[])
+  guard_target = XSimp (p ~~> 3 ** \[], \[], \[]) (\[], \[], p ~~> _ ** \[])
   xsimp_step_r
   guard_target = XSimp (\[], \[], \[]) (\[], \[], \[])
   simp [XSimp]
@@ -435,7 +428,7 @@ example {p}:
   xsimp_start
   repeat xsimp_step_l
   xsimp_step_r
-  guard_target = XSimp (p ~~> 3 ** \[], \[], \[]) (\[], \[], p ~~> [slf| [(?n + 1: Int)] ] ** \[])
+  guard_target = XSimp (p ~~> 3 ** \[], \[], \[]) (\[], \[], p ~~> [slf| [(_ + 1: Int)] ] ** \[])
   xsimp_step_r
   . show (3: Val) = (.int (2 + 1))
     congr
@@ -453,7 +446,7 @@ example {p}:
     XSimp (H1 ** p ~~> 3 ** \[], \[], \[]) (H2 ** \[], \[], (\∃ (n: Int), p ~~> [slf| [n] ]) ** \[])
   xsimp_step_r
   guard_target =
-    XSimp (H1 ** p ~~> 3 ** \[], \[], \[]) (H2 ** \[], \[], p ~~> [slf| [?n] ] ** \[])
+    XSimp (H1 ** p ~~> 3 ** \[], \[], \[]) (H2 ** \[], \[], p ~~> _ ** \[])
   xsimp_step_r
   guard_target =
     XSimp (H1 ** \[], \[], \[]) (H2 ** \[], \[], \[])
@@ -522,7 +515,7 @@ example {H1 H2 H3}:
   xsimp_step_r
   guard_hyp xsimp_hint := xhint[]
   xsimp_step_r
-  . guard_target = ?n > 3
+  . guard_target = _ > 3
     show 4 > 3
     grind
   . grind
@@ -548,7 +541,7 @@ example {H1 H2 H3}:
   xsimp_start
   repeat' xsimp_step_l
   repeat' xsimp_step_r
-  . guard_target = ?m = 3
+  . guard_target = _ = 3
     show 3 = 3
     lia
   . guard_target = 2 = 2
@@ -583,7 +576,7 @@ example {H1 H2 H3}:
   xsimp_step_r
   xsimp_step_r
   . guard_target =
-      XSimp (H1 ** \[], \[], \[]) (H2 ** \[], \[], ((p ~~> [slf| [?n] ] ** H3) ** H4) ** \[])
+      XSimp (H1 ** \[], \[], \[]) (H2 ** \[], \[], ((p ~~> _ ** H3) ** H4) ** \[])
     sorry
   . guard_target = Int
     sorry
@@ -626,7 +619,7 @@ example {H1 H2 H3}:
   guard_target =
     XSimp
       ((Q' -** Q1) ** (Q1 -** Q2) ** F Q' ** \[], \[], \[])
-      (\[], \[], F ?Q' ** (?Q' -** Q2) ** \[])
+      (\[], \[], F _ ** (_ -** Q2) ** \[])
   xsimp_step_r
   guard_target =
     XSimp

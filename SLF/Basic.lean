@@ -262,3 +262,25 @@ theorem triple_get_and_free : ∀ (p: Loc) (v: Val),
   xwp
   xsteps
   xsimp
+
+def two_dice: Val := [slf|
+  vfun u =>
+    let n1 := rand 6 in
+    let n2 := rand 6 in
+    let s := n1 + n2 in
+    s + 2
+]
+
+theorem triple_two_dice:
+  Triple [slf| [two_dice] unit ]
+    \[]
+    (fun r => \∃ n: Int, \[r == n] ** \[2 <= n] ** \[n <= 12])
+:= by
+  xwp
+  xrand v1 Lv1 Hv1
+  xrand v2 Lv2 Hv2
+  xsteps
+  xsimp
+  . rfl
+  . lia
+  . lia

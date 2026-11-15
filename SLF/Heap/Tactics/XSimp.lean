@@ -500,8 +500,7 @@ example {H1 H2 H3 H4}:
   H1 ==> H2 ** \∃ (n: Int), (p ~~> n ** H3) ** H4
 := by
   xsimp
-  guard_target = H1 ==> H2 ** p ~~> ?n ** H3 ** H4
-  . guard_target = H1 ==> H2 ** p ~~> ?n ** H3 ** H4
+  . guard_target = H1 ==> H2 ** p ~~> _ ** H3 ** H4
     sorry
   . guard_target = Int
     sorry

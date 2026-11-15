@@ -191,6 +191,15 @@ macro "xapp" t:term : tactic => `(tactic|
   (xlet_xseq?; xstruct?; apply XLemmas.xapp_protect; apply $t; (try any_goals xsimp); all_goals (try simp [Protect]) <;> xdisplay)
 )
 
+/--
+`xrand` tactic applies the `xapp Triple.rand` tactic,
+introduces the necessary variables, and performs substitution.
+-/
+macro "xrand" t:binderIdent h1:binderIdent h2:binderIdent : tactic => `(tactic|
+  xapp Triple.rand <;>
+  intro x [binderIdent| $t] _ <;> subst x <;> intro [binderIdent| $h1] [binderIdent| $h2]
+)
+
 syntax "xfun" (" with " term )? : tactic
 
 macro_rules
@@ -329,6 +338,18 @@ example (p: Loc) (n: Int):
   xlet
   xapp_op
   xapp_op
+
+example:
+  Triple [slf| rand 6]
+    \[]
+    (fun r => \∃ n: Int, \[r == n] ** \[0 <= n] ** \[n < 6])
+:= by
+  xwp
+  xrand v Lv Hv
+  xsimp
+  . rfl
+  . assumption
+  . assumption
 
 example (p q: Loc) (n m: Int):
   Triple [slf| [incr_two] [p] [q] ]

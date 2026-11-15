@@ -182,6 +182,11 @@ end TacticMark
 section Misc
 open Lean
 
+syntax "[binderIdent|" binderIdent "]": term
+macro_rules
+  | `([binderIdent| _]) => `(_)
+  | `([binderIdent| $i:ident]) => `($i)
+
 def Lean.Meta.isDefEqOpaque (e1 e2: Expr): MetaM Bool := do
   withAssignableSyntheticOpaque do
     isDefEq e1 e2
