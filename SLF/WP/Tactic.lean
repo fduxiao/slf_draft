@@ -185,7 +185,7 @@ elab "xapp_op": tactic => withMainContext do
 and performs substitution.
 -/
 macro "xref" t:term : tactic => `(tactic|
-  xapp_op <;> intro x $t E <;> subst x
+  (xapp_op; intro x $t E; subst x)
 )
 
 macro "xapp'" t:term : tactic => `(tactic|
@@ -260,7 +260,7 @@ elab "xwp_funs": tactic => withMainContext do
   let (_f, args) ← XHelpers.splitApp t
   let vars ← XHelpers.mkVarList args.length
   let ts ← XHelpers.mkTermList args
-  evalTactic <| ← `(tactic| apply XLemmas.xwp_funs (xs := $vars) (ts := $ts) rfl rfl rfl rfl)
+  evalTactic <| ← `(tactic| refine XLemmas.xwp_funs (xs := $vars) (ts := $ts) rfl rfl rfl rfl ?_)
 
 elab "xwp_fixs?": tactic => withMainContext do
   let goal ← getMainGoalQ
