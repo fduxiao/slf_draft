@@ -7,4 +7,4 @@ import SLF.Heap
 import SLF.Semantics
 import SLF.Triple
 import SLF.WP
-import SLF.Basic
+import SLF.Chapters
