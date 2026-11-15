@@ -115,14 +115,19 @@ open Lang in
 elab "xif": tactic => withMainContext do
   evalTactic <| ← `(tactic| xlet_xseq? <;> xstruct?)
   let goal: Q(Prop) ← getMainGoalQ
-  match goal with
+  let t ← match goal with
   | ~q($H ==> (wpgen.if $F1 $F2 $F3) $Q) =>
     match F1 with
-    | ~q([slf| true]) => evalTactic <| ← `(tactic| apply XLemmas.xif_true)
-    | ~q([slf| false]) => evalTactic <| ← `(tactic| apply XLemmas.xif_false)
-    | _ => evalTactic <| ← `(tactic| apply XLemmas.xif <;> try simp)
+    | ~q([slf| true]) => `(tactic| apply XLemmas.xif_true)
+    | ~q([slf| false]) => `(tactic| apply XLemmas.xif_false)
+    | _ => `(tactic| apply XLemmas.xif <;> try simp)
   | _ => throwError "xif tactic failed: {goal} is not an if structure"
-  evalTactic <| ← `(tactic| xdisplay)
+  evalTactic <| ← `(tactic| $t <;> xdisplay)
+
+macro "xif" i:binderIdent : tactic => `(tactic| xif <;> intro [binderIdent| $i])
+macro "xif" i1:binderIdent " | " i2:binderIdent : tactic => `(tactic|
+  (xif; intro [binderIdent| $i1]; rotate_left; intro [binderIdent| $i2]; rotate_right)
+)
 
 macro "xtriple":tactic => `(tactic| intros <;> apply XLemmas.xtriple)
 macro "xtriple?": tactic => `(tactic| try xtriple)
@@ -479,6 +484,77 @@ example (n acc: Nat):
     xapp (IH _)
     xstep
     xsimp
+
+/--
+factorial using state
+-/
+def factoimp_aux : Val := [slf|
+  vfix f r i n =>
+    let b := i < n in
+    if b then
+      let j := i + 1 in
+      let s := !r in
+      let p := s * j in
+      r := p;
+      f r j n
+    end
+]
+
+def factoimp : Val := [slf|
+  vfun n =>
+    let r := ref 1 in
+    [factoimp_aux] r 0 n;
+    let m := !r in
+    free r;
+    m
+]
+
+theorem triple_factoimp_aux (r: Loc) (i n: Nat):
+  i ≤ n →
+  Triple [slf| [factoimp_aux] [r] [i] [n] ]
+    (r ~~> Nat.factorial i)
+    (fun _ => r ~~> Nat.factorial n)
+:= by
+  intro Hle
+  induction E: n - i generalizing i
+  case zero =>
+    simp
+    xwp
+    xsteps
+    xif _
+    . exfalso; omega
+    . xval
+      xsimp
+      congr
+      omega
+  case succ d IH =>
+    simp_all
+    xwp
+    xsteps
+    xif _
+    . xsteps
+      xapp IH
+      . omega
+      . omega
+      . simp [Nat.factorial]
+        ac_rfl
+    . xval
+      xsimp
+      congr
+      omega
+
+theorem triple_factoimp (n: Nat):
+  Triple [slf| [factoimp] [n] ]
+    \[]
+    (fun r => \[r == Nat.factorial n])
+:= by
+  xwp
+  xref p
+  xapp triple_factoimp_aux
+  xstep
+  xstep
+  xstep
+  xsimp
 
 example {n: Int} {p: Loc}:
   let is3: Val := [slf|
