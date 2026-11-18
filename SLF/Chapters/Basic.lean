@@ -1,6 +1,6 @@
 import SLF.WP
 
-namespace Basic
+namespace SLF.Chapters.Basic
 open SLF Lang WP Heap XSimp
 
 def incr : Val := [slf|
