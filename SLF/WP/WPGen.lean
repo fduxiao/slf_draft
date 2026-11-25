@@ -381,6 +381,15 @@ theorem wpgen.val_sound {v: Val}:
   simp [wpgen.val]
   apply WP.val
 
+@[simp, grind .]
+theorem wpgen.var_sound {ctx} {x: Var}:
+  Formula.sound (Term.isubst ctx [slf| [x] ]) (wpgen.var ctx x)
+:= by
+  simp [var, Term.isubst]
+  split
+  . simp_all
+  . simp_all
+
 @[grind .]
 theorem wpgen.fun_sound {x} {t1: Term} {Fof}:
   (∀ vx, Formula.sound (t1.subst x vx) (Fof vx)) →
@@ -1203,8 +1212,8 @@ example:
 
 /--
 Defined to be the following
-```
-[slf|
+```lean
+def factorial: Val := [slf|
   vfix f n =>
     let b := n > 0 in
     if b then

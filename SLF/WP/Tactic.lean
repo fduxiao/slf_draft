@@ -439,7 +439,7 @@ example:
   xsimp
 
 example (n: Nat):
-  Triple (.app factorial n)
+  Triple [slf| [factorial] [n] ]
     \[]
     (fun r => \[r = (Nat.factorial n)])
 := by
